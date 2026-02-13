@@ -1,6 +1,6 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2021-2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 #include <mutex>
 #include <QDir>
 #include <boost/pfr.hpp>
-#include <magic_enum.hpp>
+#include <magic_enum/magic_enum.hpp>
 
 #include <Config.h>
 #include "../Logger.h"
@@ -81,13 +81,6 @@ void OnApply_automatic_ear_detection(const Fields &newFields)
 
     ApdApp->GetMainWindow()->GetApdMgr().OnAutomaticEarDetectionChanged(
         newFields.automatic_ear_detection);
-}
-
-void OnApply_rssi_min(const Fields &newFields)
-{
-    LOG(Info, "OnApply_rssi_min: {}", newFields.rssi_min);
-
-    ApdApp->GetMainWindow()->GetApdMgr().OnRssiMinChanged(newFields.rssi_min);
 }
 
 void OnApply_device_address(const Fields &newFields)

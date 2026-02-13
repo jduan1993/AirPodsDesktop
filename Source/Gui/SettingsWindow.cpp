@@ -1,6 +1,6 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2021-2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -86,12 +86,12 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QDialog{parent}
 
     auto versionText =
         QString{"<a href=\"%1\">v%2</a>"}
-            .arg("https://github.com/SpriteOvO/AirPodsDesktop/releases/tag/" CONFIG_VERSION_STRING)
+            .arg("https://github.com/jduan1993/AirPodsDesktop/releases/tag/" CONFIG_VERSION_STRING)
             .arg(CONFIG_VERSION_STRING);
 #if defined APD_BUILD_GIT_HASH
     versionText +=
         QString{" (<a href=\"%1\">%2</a>)"}
-            .arg("https://github.com/SpriteOvO/AirPodsDesktop/commit/" APD_BUILD_GIT_HASH)
+            .arg("https://github.com/jduan1993/AirPodsDesktop/commit/" APD_BUILD_GIT_HASH)
             .arg(QString{APD_BUILD_GIT_HASH}.left(7));
 #endif
     _ui.lbVersion->setText(versionText);
@@ -101,9 +101,6 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QDialog{parent}
 
     _ui.hlTipAutoEarDetection->addWidget(
         new TipLabel{constMetaFields.automatic_ear_detection.Description(), this});
-
-    _ui.hsMaxReceivingRange->setMinimum(50);
-    _ui.hsMaxReceivingRange->setMaximum(100);
 
     for (const auto &locale : ApdApp->AvailableLocales()) {
         _ui.cbLanguages->addItem(locale.nativeLanguageName());
@@ -138,12 +135,6 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QDialog{parent}
     connect(_ui.cbAutoEarDetection, &QCheckBox::toggled, this, [this](bool checked) {
         if (_trigger) {
             On_cbAutoEarDetection_toggled(checked);
-        }
-    });
-
-    connect(_ui.hsMaxReceivingRange, &QSlider::valueChanged, this, [this](int value) {
-        if (_trigger) {
-            On_hsMaxReceivingRange_valueChanged(value);
         }
     });
 
@@ -293,8 +284,6 @@ void SettingsWindow::Update(const Fields &fields, bool trigger)
 
     _ui.cbAutoEarDetection->setChecked(fields.automatic_ear_detection);
 
-    _ui.hsMaxReceivingRange->setValue(-fields.rssi_min);
-
     auto [batteryOnTrayIconDisable, batteryOnTrayIconWhenLowBattery, batteryOnTrayIconAlways] =
         std::make_tuple(
             fields.tray_icon_battery == TrayIconBatteryBehavior::Disable,
@@ -364,7 +353,7 @@ void SettingsWindow::On_cbLanguages_currentIndexChanged(int index)
         _ui.cbLanguages->setCurrentIndex(_lastLanguageIndex);
         // clang-format off
         QDesktopServices::openUrl(QUrl{
-            "https://github.com/SpriteOvO/AirPodsDesktop/blob/main/CONTRIBUTING.md#-translation-guide"
+            "https://github.com/jduan1993/AirPodsDesktop/blob/main/CONTRIBUTING.md#-translation-guide"
         });
         // clang-format on
     }
@@ -399,11 +388,6 @@ void SettingsWindow::On_cbLowAudioLatency_toggled(bool checked)
 void SettingsWindow::On_cbAutoEarDetection_toggled(bool checked)
 {
     ModifiableAccess()->automatic_ear_detection = checked;
-}
-
-void SettingsWindow::On_hsMaxReceivingRange_valueChanged(int value)
-{
-    ModifiableAccess()->rssi_min = -value;
 }
 
 void SettingsWindow::On_pbOpenLogsDirectory_clicked()

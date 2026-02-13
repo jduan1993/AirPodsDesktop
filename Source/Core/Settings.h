@@ -1,6 +1,6 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2021-2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -44,7 +44,6 @@ enum class LoadResult : uint32_t { AbiIncompatible, NoAbiField, Successful };
         Impl::OnApply(&OnApply_automatic_ear_detection),                                           \
         Impl::Desc{QObject::tr("It automatically pauses or resumes media when your AirPods are taken out or put in your ears.")}) \
     callback(QString, skipped_version, {})                                                         \
-    callback(int16_t, rssi_min, {-80}, Impl::OnApply(&OnApply_rssi_min))                           \
     callback(bool, reduce_loud_sounds, {false}, Impl::Deprecated())                                \
     callback(uint32_t, loud_volume_level, {40}, Impl::Deprecated())                                \
     callback(uint64_t, device_address, {0},                                                        \
@@ -211,7 +210,6 @@ void OnApply_language_locale(const Fields &newFields);
 void OnApply_auto_run(const Fields &newFields);
 void OnApply_low_audio_latency(const Fields &newFields);
 void OnApply_automatic_ear_detection(const Fields &newFields);
-void OnApply_rssi_min(const Fields &newFields);
 void OnApply_device_address(const Fields &newFields);
 void OnApply_tray_icon_battery(const Fields &newFields);
 void OnApply_battery_on_taskbar(const Fields &newFields);

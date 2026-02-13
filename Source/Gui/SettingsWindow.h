@@ -1,6 +1,6 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2021-2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -68,7 +68,6 @@ private:
     // Features
     void On_cbLowAudioLatency_toggled(bool checked);
     void On_cbAutoEarDetection_toggled(bool checked);
-    void On_hsMaxReceivingRange_valueChanged(int value);
 
     // About
     void On_pbOpenLogsDirectory_clicked();

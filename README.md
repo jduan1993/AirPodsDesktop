@@ -1,20 +1,20 @@
 <h1 align="center">
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop"><img src="/Source/Resource/Image/Icon.svg" alt="Icon" width="128"></a>
+    <a href="https://github.com/jduan1993/AirPodsDesktop"><img src="/Source/Resource/Image/Icon.svg" alt="Icon" width="128"></a>
     <br>
     AirPodsDesktop
 </h1>
 <p align="center">AirPods desktop user experience enhancement program</p>
 <p align="center">
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/actions/workflows/windows.yml">
-        <img src="https://github.com/SpriteOvO/AirPodsDesktop/actions/workflows/windows.yml/badge.svg"/>
+    <a href="https://github.com/jduan1993/AirPodsDesktop/actions/workflows/windows.yml">
+        <img src="https://github.com/jduan1993/AirPodsDesktop/actions/workflows/windows.yml/badge.svg"/>
     </a>
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/releases">
-        <img src="https://img.shields.io/github/v/release/SpriteOvO/AirPodsDesktop?include_prereleases"/>
+    <a href="https://github.com/jduan1993/AirPodsDesktop/releases">
+        <img src="https://img.shields.io/github/v/release/jduan1993/AirPodsDesktop?include_prereleases"/>
     </a>
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/releases">
-        <img src="https://img.shields.io/github/downloads/SpriteOvO/AirPodsDesktop/total.svg"/>
+    <a href="https://github.com/jduan1993/AirPodsDesktop/releases">
+        <img src="https://img.shields.io/github/downloads/jduan1993/AirPodsDesktop/total.svg"/>
     </a>
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/compare">
+    <a href="https://github.com/jduan1993/AirPodsDesktop/compare">
         <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"/>
     </a>
     <a href="/LICENSE">
@@ -27,18 +27,27 @@
 ![Preview Image](/Assets/Preview.gif)
 
 ## ✨ Features
+#### v0.5.0 (Current)
+* 🛡️ **Smarter In-Ear Detection**:
+  * Added 500ms debounce to effectively prevent accidental pauses caused by signal jitter.
+  * Logic optimized: Play when ANY pod is in ear; Pause ONLY when BOTH pods are removed.
+* 🔒 **Strict Device Filtering**: Automatically locks onto your bound model and simplifies usage by removing complex RSSI settings, completely ignoring interference from other devices.
+* 🚀 **Stability & Performance**: Refactored internal state management to eliminate deadlock risks, ensuring reliable media control.
+* 📦 **Installer Improvements**: Standardized app name and icon in Windows installation list, and fixed the missing installation size issue.
+
+#### v0.4.1
 * 🔋 Battery information display.
 * 👂 Automatic ear detection.
 * 🚀 Low audio latency mode.
-* 🌈 Beautiful animation.  
+* 🌈 Beautiful animations.  
 
 ## 🛠️ Build
 See the [Build Instructions](/Docs/Build.md).
 
 ## 🤝 Contribute
 *AirPodsDesktop* is an open source project, here are some ways you can contribute:
-* [Open an issue](https://github.com/SpriteOvO/AirPodsDesktop/issues/new/choose) to report bugs or suggest new features.
-* [Submit a PR](https://github.com/SpriteOvO/AirPodsDesktop/compare) to fix a known bug or try something from the TODO list.
+* [Open an issue](https://github.com/jduan1993/AirPodsDesktop/issues/new/choose) to report bugs or suggest new features.
+* [Submit a PR](https://github.com/jduan1993/AirPodsDesktop/compare) to fix a known bug or try something from the TODO list.
 * [Translate to other languages](/CONTRIBUTING.md#-translation-guide) or [improve existing translations](/CONTRIBUTING.md#-translation-guide).
 
 ## 💎 ThirdParty
@@ -53,6 +62,7 @@ See the [Build Instructions](/Docs/Build.md).
 * [stacktrace](https://github.com/boostorg/stacktrace) ([BSL-1.0 License](https://www.boost.org/LICENSE_1_0.txt))
 
 ## 🍺 Credits
+* [SpriteOvO](https://github.com/SpriteOvO/AirPodsDesktop)
 * [OpenPods](https://github.com/adolfintel/OpenPods)
 * [Discontinued Privacy: Personal Data Leaks in Apple Bluetooth-Low-Energy Continuity Protocols](https://hal.inria.fr/hal-02394619/document)
 * [MagicPods](https://magicpods.app/)

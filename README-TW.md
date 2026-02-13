@@ -1,20 +1,20 @@
 <h1 align="center">
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop"><img src="/Source/Resource/Image/Icon.svg" alt="Icon" width="128"></a>
+    <a href="https://github.com/jduan1993/AirPodsDesktop"><img src="/Source/Resource/Image/Icon.svg" alt="Icon" width="128"></a>
     <br>
     AirPodsDesktop
 </h1>
 <p align="center">AirPods 桌面使用者體驗增進軟體</p>
 <p align="center">
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/actions/workflows/windows.yml">
-        <img src="https://github.com/SpriteOvO/AirPodsDesktop/actions/workflows/windows.yml/badge.svg"/>
+    <a href="https://github.com/jduan1993/AirPodsDesktop/actions/workflows/windows.yml">
+        <img src="https://github.com/jduan1993/AirPodsDesktop/actions/workflows/windows.yml/badge.svg"/>
     </a>
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/releases">
-        <img src="https://img.shields.io/github/v/release/SpriteOvO/AirPodsDesktop?include_prereleases"/>
+    <a href="https://github.com/jduan1993/AirPodsDesktop/releases">
+        <img src="https://img.shields.io/github/v/release/jduan1993/AirPodsDesktop?include_prereleases"/>
     </a>
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/releases">
-        <img src="https://img.shields.io/github/downloads/SpriteOvO/AirPodsDesktop/total.svg"/>
+    <a href="https://github.com/jduan1993/AirPodsDesktop/releases">
+        <img src="https://img.shields.io/github/downloads/jduan1993/AirPodsDesktop/total.svg"/>
     </a>
-    <a href="https://github.com/SpriteOvO/AirPodsDesktop/compare">
+    <a href="https://github.com/jduan1993/AirPodsDesktop/compare">
         <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"/>
     </a>
     <a href="/LICENSE">
@@ -27,6 +27,15 @@
 ![Preview Image](/Assets/Preview.gif)
 
 ## ✨ 功能
+#### v0.5.0 (目前版本)
+* 🛡️ **更智能的入耳偵測**：
+  * 引入 500ms 防抖機制，有效解決因訊號抖動或干擾導致的瞬間誤暫停。
+  * 邏輯優化：任意一隻耳機入耳即觸發播放；只有當兩隻耳機均離開耳朵時才會觸發暫停。
+* 🔒 **精準設備過濾**：自動鎖定已配對的設備型號，並簡化了使用邏輯（移除繁瑣的訊號強度調節），徹底忽略周圍其他設備干擾。
+* 🚀 **性能與穩定性增強**：重構了狀態管理邏輯，消除潛在的死鎖風險，確保媒體控制更加可靠。
+* 📦 **安裝程式優化**：規範了 Windows 安裝列表中的應用名稱與圖示顯示，並修復了無法正確顯示安裝體積的問題。
+
+#### v0.4.1
 * 🔋 電池資訊顯示。
 * 👂 入耳自動偵測。
 * 🚀 低延遲音訊模式。
@@ -37,8 +46,8 @@
 
 ## 🤝 貢獻
 *AirPodsDesktop* 是一個開源項目，您可以透過以下方式貢獻：
-* [開立問題](https://github.com/SpriteOvO/AirPodsDesktop/issues/new/choose) 以回報錯誤或建議新功能。
-* [提取要求](https://github.com/SpriteOvO/AirPodsDesktop/compare) 以修正已知 BUG 或嘗試 TODO 清單中的項目。
+* [開立問題](https://github.com/jduan1993/AirPodsDesktop/issues/new/choose) 以回報錯誤或建議新功能。
+* [提取要求](https://github.com/jduan1993/AirPodsDesktop/compare) 以修正已知 BUG 或嘗試 TODO 清單中的項目。
 * [翻譯成其它語言](/CONTRIBUTING.md#-translation-guide) 或 [改進現有的翻譯](/CONTRIBUTING.md#-translation-guide)。
 
 ## 💎 第三方
@@ -53,6 +62,7 @@
 * [stacktrace](https://github.com/boostorg/stacktrace) ([BSL-1.0 License](https://www.boost.org/LICENSE_1_0.txt))
 
 ## 🍺 銘謝
+* [SpriteOvO](https://github.com/SpriteOvO/AirPodsDesktop)
 * [OpenPods](https://github.com/adolfintel/OpenPods)
 * [Discontinued Privacy: Personal Data Leaks in Apple Bluetooth-Low-Energy Continuity Protocols](https://hal.inria.fr/hal-02394619/document)
 * [MagicPods](https://magicpods.app/)

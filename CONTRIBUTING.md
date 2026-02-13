@@ -22,7 +22,7 @@ Before you start contributing, make sure you already understand how Git works. Y
 
 3. This step is to get the `.ts` translation file for a new target locale. If you just want to improve an existing translation, you can skip this step.
 
-   You can [open an issue](https://github.com/SpriteOvO/AirPodsDesktop/issues/new/choose) to request a `.ts` translation file directly. Or continue with this step to get the `.ts` translation file yourself (requires you to build *AirPodsDesktop* yourself).
+   You can [open an issue](https://github.com/jduan1993/AirPodsDesktop/issues/new/choose) to request a `.ts` translation file directly. Or continue with this step to get the `.ts` translation file yourself (requires you to build *AirPodsDesktop* yourself).
 
    1. Follow the [Build Instructions](/Docs/Build.md) to complete the first build.
 
@@ -36,4 +36,4 @@ Before you start contributing, make sure you already understand how Git works. Y
 
 5. If you search for comments containing "credit" in *Qt Linguist*, you will see a text for crediting translators. If you wish, you can add your name to its translation as required by the developer comment.
 
-6. After completing the translation work, [submit a PR](https://github.com/SpriteOvO/AirPodsDesktop/compare) for merging.
+6. After completing the translation work, [submit a PR](https://github.com/jduan1993/AirPodsDesktop/compare) for merging.

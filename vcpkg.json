@@ -1,6 +1,6 @@
 {
   "name": "airpods-desktop",
-  "version-string": "0.4.1",
+  "version-string": "0.5.0",
   "dependencies": [
     {
       "name": "cpr",
@@ -10,7 +10,12 @@
     "nlohmann-json",
     "magic-enum",
     "boost-pfr",
-    "boost-stacktrace"
+    {
+      "name": "boost-stacktrace",
+      "features": [
+        "windbg"
+      ]
+    }
   ],
-  "builtin-baseline": "2fee3d30d0f4648520a693f8ee3341c883fc5761"
+  "builtin-baseline": "36fb57eb3878cc3422351a91d3e87c328388dabd"
 }

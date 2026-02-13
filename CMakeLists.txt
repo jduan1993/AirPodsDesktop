@@ -1,6 +1,6 @@
 #
 # AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-# Copyright (C) 2021-2022 SpriteOvO
+# Copyright (C) 2021-2026 Hugo Duan
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,10 +20,10 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     AirPodsDesktop
-    VERSION 0.4.1 # Don't forget to bump the version in `vcpkg.json` as well
+    VERSION 0.5.0 # Don't forget to bump the version in `vcpkg.json` as well
     LANGUAGES C CXX
     DESCRIPTION "AirPods desktop user experience enhancement program"
-    HOMEPAGE_URL "https://github.com/SpriteOvO/AirPodsDesktop"
+    HOMEPAGE_URL "https://github.com/jduan1993/AirPodsDesktop"
 )
 
 include(FetchContent)
@@ -400,66 +400,113 @@ endif()
 
 ##################################################
 # Installer generate
-#
+##################################################
 
 if (APD_GENERATE_INSTALLER)
-    set(CPACK_PACKAGE_VENDOR ${PROJECT_NAME})
+
+    #
+    # --- 基本信息 ---
+    #
+    set(CPACK_GENERATOR "NSIS")
+    set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+    set(CPACK_PACKAGE_VENDOR "Hugo Duan")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+    set(CPACK_PACKAGE_HOMEPAGE_URL "${CMAKE_PROJECT_HOMEPAGE_URL}")
+
+    set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+    set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+    set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "${PROJECT_NAME}")
     set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/Installer")
-    set(CPACK_PACKAGE_VERSION_MAJOR ${AirPodsDesktop_VERSION_MAJOR})
-    set(CPACK_PACKAGE_VERSION_MINOR ${AirPodsDesktop_VERSION_MINOR})
-    set(CPACK_PACKAGE_VERSION_PATCH ${AirPodsDesktop_VERSION_PATCH})
-    set(CPACK_PACKAGE_INSTALL_DIRECTORY ${PROJECT_NAME})
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-    set(CPACK_PACKAGE_EXECUTABLES "${PROJECT_NAME}" ${PROJECT_NAME})
 
+    #
+    # --- 程序入口 ---
+    #
+    set(CPACK_PACKAGE_EXECUTABLES "${PROJECT_NAME}" "AirPodsDesktop")
+
+    #
+    # --- 图标 ---
+    #
     set(ICON_FILEPATH "${CMAKE_CURRENT_SOURCE_DIR}/Source/Resource/Image/Icon.ico")
-    set(SHORTCUT_NAME "AirPods Desktop")
+    string(REPLACE "/" "\\\\" ICON_FILEPATH "${ICON_FILEPATH}")
 
-    if (MSVC)
-        set(CPACK_GENERATOR NSIS)
-        set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-        set(CPACK_NSIS_URL_INFO_ABOUT ${CMAKE_PROJECT_HOMEPAGE_URL})
-        set(CPACK_NSIS_EXECUTABLES_DIRECTORY "./")
-        set(CPACK_NSIS_MUI_FINISHPAGE_RUN "./${PROJECT_NAME}.exe")
-        set(CPACK_NSIS_BRANDING_TEXT "${PROJECT_NAME} installer")
-        string(REPLACE "/" "\\\\" ICON_FILEPATH ${ICON_FILEPATH})
-        set(CPACK_NSIS_MUI_ICON ${ICON_FILEPATH})
+    set(CPACK_NSIS_MUI_ICON "${ICON_FILEPATH}")
+    set(CPACK_NSIS_MUI_UNIICON "${ICON_FILEPATH}")
 
-        # Create and remove shortcut
-        #
-        # Workaround for: https://gitlab.kitware.com/cmake/cmake/-/issues/15982
-        #                 (I can't believe this is an unsolved issue 5 years old lol..)
-        #
-        set(
-            CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-            "CreateShortCut \\\"$DESKTOP\\\\${SHORTCUT_NAME}.lnk\\\" \\\"$INSTDIR\\\\${PROJECT_NAME}.exe\\\""
-        )
-        set(
-            CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
-            "Delete \\\"$DESKTOP\\\\${SHORTCUT_NAME}.lnk\\\""
-        )
-    endif()
+    #
+    # --- NSIS 行为 ---
+    #
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_NSIS_MODIFY_PATH OFF)
+    set(CPACK_NSIS_URL_INFO_ABOUT "${CMAKE_PROJECT_HOMEPAGE_URL}")
+    set(CPACK_NSIS_EXECUTABLES_DIRECTORY "./")
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "${PROJECT_NAME}.exe")
+    set(CPACK_NSIS_BRANDING_TEXT "${PROJECT_NAME} Installer")
 
-    # Prevent CMake from adding "include" and "lib" directories
+    #
+    # --- 开始菜单目录 ---
+    #
+    set(CPACK_NSIS_MENU_LINKS
+        "${PROJECT_NAME}.exe" "AirPodsDesktop"
+    )
+
+    #
+    # --- 安装文件 ---
     #
     install(
         DIRECTORY "${APD_BINARY_OUT_DIR}/"
-        DESTINATION "./"
+        DESTINATION "."
         COMPONENT ${PROJECT_NAME}
         PATTERN "*.ilk" EXCLUDE
         PATTERN "*.exp" EXCLUDE
         PATTERN "*.lib" EXCLUDE
     )
+
     set(CPACK_COMPONENTS_ALL ${PROJECT_NAME})
 
+    #
+    # --- 卸载列表图标和大小修正 ---
+    #
+    # 设置卸载程序在控制面板中显示的图标
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "${PROJECT_NAME}.exe")
+    
+    # 设置在“添加/删除程序”中显示的友好名称
+    set(CPACK_NSIS_DISPLAY_NAME "AirPodsDesktop")
+
+    # 使用 NSIS 脚本在安装时动态计算大小并写入注册表
+    # SectionGetSize 0 $0 指的是获取第一个安装节（通常是主程序）的大小
+    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
+        "
+        CreateShortCut \\\"$DESKTOP\\\\AirPodsDesktop.lnk\\\" \\\"$INSTDIR\\\\${PROJECT_NAME}.exe\\\"
+
+        # 运行时计算大小（单位 KB）并写入注册表
+        SectionGetSize 0 $0
+        WriteRegDWORD HKLM \\\"Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Uninstall\\\\${CPACK_PACKAGE_NAME}\\\" \\\"EstimatedSize\\\" $0
+        "
+    )
+
+    set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
+        "
+        Delete \\\"$DESKTOP\\\\AirPodsDesktop.lnk\\\"
+        "
+    )
+
+    #
+    # --- 生成安装包 ---
+    #
     add_custom_command(
         TARGET ${PROJECT_NAME}
         POST_BUILD
         COMMAND "${CMAKE_CPACK_COMMAND}" "-C" "$<CONFIGURATION>"
         COMMENT "Generating installer..."
     )
+
 endif()
-include(CPack) # We always need variable "CPACK_SYSTEM_NAME"
+
+include(CPack)
+
 
 ##################################################
 # Configure

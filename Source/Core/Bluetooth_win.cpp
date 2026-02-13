@@ -1,6 +1,6 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2021-2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -299,8 +299,12 @@ bool AdvertisementWatcher::Start()
         _lastStartTime = std::chrono::steady_clock::now();
 
         std::lock_guard<std::mutex> lock{_mutex};
+        
+        // Use Active scanning mode to improve the probability of capturing AirPods advertisements
+        _bleWatcher.ScanningMode(BluetoothLEScanningMode::Active);
+        
         _bleWatcher.Start();
-        LOG(Info, "Bluetooth AdvWatcher start succeeded.");
+        LOG(Info, "Bluetooth AdvWatcher start succeeded. Mode: Active");
         CbStateChanged().Invoke(State::Started, std::nullopt);
         return true;
     }

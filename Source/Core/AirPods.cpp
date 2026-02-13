@@ -1,6 +1,6 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2021-2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -183,27 +183,11 @@ void StateManager::Disconnect()
     ResetAll();
 }
 
-void StateManager::OnRssiMinChanged(int16_t rssiMin)
-{
-    std::lock_guard<std::mutex> lock{_mutex};
-    _rssiMin = rssiMin;
-}
-
 bool StateManager::IsPossibleDesiredAdv(const Advertisement &adv) const
 {
-    const auto advRssi = adv.GetRssi();
-    if (advRssi < _rssiMin) {
-        LOG(Warn,
-            "IsPossibleDesiredAdv returns false. Reason: RSSI is less than the limit. "
-            "curr: '{}' min: '{}'",
-            advRssi, _rssiMin);
-        return false;
-    }
-
     const auto &advState = adv.GetAdvState();
 
     auto &lastAdv = advState.side == Side::Left ? _adv.left : _adv.right;
-    auto &lastAnotherAdv = advState.side == Side::Left ? _adv.right : _adv.left;
 
     // If the Random Non-resolvable Address of our devices is changed
     // or the packet is sent from another device that it isn't ours
@@ -239,32 +223,17 @@ bool StateManager::IsPossibleDesiredAdv(const Advertisement &adv) const
         }
 
         // The battery changes in steps of 1, so the data of two packets in a short time
-        // can not exceed 1, otherwise it is not our device
+        // can not exceed 5 (relaxed from 1), otherwise it is not our device
         //
-        if (leftBatteryDiff > 1 || rightBatteryDiff > 1 || caseBatteryDiff > 1) {
+        if (leftBatteryDiff > 5 || rightBatteryDiff > 5 || caseBatteryDiff > 5) {
             LOG(Warn,
                 "IsPossibleDesiredAdv returns false. Reason: BatteryDiff l='{}' r='{}' c='{}'",
                 leftBatteryDiff, rightBatteryDiff, caseBatteryDiff);
             return false;
         }
 
-        int16_t rssiDiff = std::abs(advRssi - lastAdv->first.GetRssi());
-        if (rssiDiff > 50) {
-            LOG(Warn, "IsPossibleDesiredAdv returns false. Reason: Current side rssiDiff '{}'",
-                rssiDiff);
-            return false;
-        }
-
-        LOG(Warn, "Address changed, but it might still be the same device.");
-    }
-
-    if (lastAnotherAdv.has_value()) {
-        int16_t rssiDiff = std::abs(advRssi - lastAnotherAdv->first.GetRssi());
-        if (rssiDiff > 50) {
-            LOG(Warn, "IsPossibleDesiredAdv returns false. Reason: Another side rssiDiff '{}'",
-                rssiDiff);
-            return false;
-        }
+        LOG(Info, "Address changed from {} to {}, but it looks like the same device.", 
+            Helper::Hash(lastAdv->first.GetAddress()), Helper::Hash(adv.GetAddress()));
     }
 
     return true;
@@ -398,12 +367,6 @@ void Manager::StopScanner()
     }
 }
 
-void Manager::OnRssiMinChanged(int16_t rssiMin)
-{
-    std::lock_guard<std::mutex> lock{_mutex};
-    _stateMgr.OnRssiMinChanged(rssiMin);
-}
-
 void Manager::OnAutomaticEarDetectionChanged(bool enable)
 {
     std::lock_guard<std::mutex> lock{_mutex};
@@ -437,11 +400,7 @@ void Manager::OnBoundDeviceAddressChanged(uint64_t address)
 
     _boundDevice = std::move(optDevice);
 
-    _deviceName = QString::fromStdString([&] {
-        auto name = _boundDevice->GetName();
-        // See https://github.com/SpriteOvO/AirPodsDesktop/issues/15
-        return name.find("Bluetooth") != std::string::npos ? std::string{} : name;
-    }());
+    _deviceName = QString::fromStdString(_boundDevice->GetName());
 
     _boundDevice->CbConnectionStatusChanged() += [this](auto &&...args) {
         std::lock_guard<std::mutex> lock{_mutex};
@@ -459,6 +418,15 @@ void Manager::OnBoundDeviceConnectionStateChanged(Bluetooth::DeviceState state)
 
     if (doDisconnect) {
         _stateMgr.Disconnect();
+    }
+    else if (_deviceConnected && !_stateMgr.GetCurrentState().has_value() && _boundDevice.has_value()) {
+        // If system connected but no advertisement received yet, 
+        // force a basic connected state to show the UI with correct model
+        State forceState;
+        forceState.model = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
+        forceState.displayName = _deviceName.isEmpty() ? "AirPods" : _deviceName;
+        ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
+        LOG(Info, "Forcing connected state for model: {}", Helper::ToUnderlying(forceState.model));
     }
 
     LOG(Info, "The device we bound is updated. current: {}, new: {}", _deviceConnected,
@@ -490,14 +458,23 @@ void Manager::OnStateChanged(Details::StateManager::UpdateEvent updateEvent)
         OnLidOpened(newLidOpened);
     }
 
-    // Both in ear
+    // In-ear state detection
+    // Logic: 
+    // - Play if ANY pod is in ear (and was previously none).
+    // - Pause if BOTH pods are out of ear (and was previously any).
     //
     if (oldState.has_value()) {
-        bool oldBothInEar = oldState->pods.left.isInEar && oldState->pods.right.isInEar;
-        bool newBothInEar = newState.pods.left.isInEar && newState.pods.right.isInEar;
-        if (oldBothInEar != newBothInEar) {
-            OnBothInEar(newBothInEar);
+        bool oldAnyInEar = oldState->pods.left.isInEar || oldState->pods.right.isInEar;
+        bool newAnyInEar = newState.pods.left.isInEar || newState.pods.right.isInEar;
+        
+        if (oldAnyInEar != newAnyInEar) {
+            OnBothInEar(newAnyInEar);
         }
+    }
+    else {
+        // Initial state after connection
+        bool newAnyInEar = newState.pods.left.isInEar || newState.pods.right.isInEar;
+        OnBothInEar(newAnyInEar);
     }
 }
 
@@ -514,16 +491,29 @@ void Manager::OnLidOpened(bool opened)
 
 void Manager::OnBothInEar(bool isBothInEar)
 {
-    if (!_automaticEarDetection) {
-        LOG(Info, "automatic_ear_detection: Do nothing because it is disabled. ({})", isBothInEar);
-        return;
-    }
-
     if (isBothInEar) {
-        Core::GlobalMedia::Play();
+        // If both in ear, play immediately and cancel any pending pause timer
+        _inEarDebounceTimer.Stop();
+        if (!_lastReportedBothInEar.exchange(true)) {
+            if (_automaticEarDetection) {
+                LOG(Info, "automatic_ear_detection: Earbud in ear detected, playing immediately.");
+                Core::GlobalMedia::Play();
+            }
+        }
     }
     else {
-        Core::GlobalMedia::Pause();
+        // If not both in ear, start a debounce timer before pausing
+        if (_lastReportedBothInEar) {
+            _inEarDebounceTimer.Start(500ms, [this] {
+                // No lock here to avoid deadlock with Stop() called under _mutex
+                if (_lastReportedBothInEar.exchange(false)) {
+                    if (_automaticEarDetection) {
+                        LOG(Info, "automatic_ear_detection: Debounce timeout, pausing music.");
+                        Core::GlobalMedia::Pause();
+                    }
+                }
+            });
+        }
     }
 }
 
@@ -535,15 +525,22 @@ bool Manager::OnAdvertisementReceived(const Bluetooth::AdvertisementWatcher::Rec
 
     Details::Advertisement adv{data};
 
-    LOG(Trace, "AirPods advertisement received. Data: {}, Address Hash: {}, RSSI: {}",
-        Helper::ToString(adv.GetDesensitizedData()), Helper::Hash(data.address), data.rssi);
-
     if (!_deviceConnected) {
-        LOG(Info, "AirPods advertisement received, but device disconnected.");
         return false;
     }
 
-    auto optUpdateEvent = _stateMgr.OnAdvReceived(Details::Advertisement{data});
+    // Strict filtering: Only process advertisements that match our bound device's model
+    if (_boundDevice.has_value()) {
+        Model boundModel = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
+        if (boundModel != Model::Unknown && adv.GetAdvState().model != boundModel) {
+            return false;
+        }
+    }
+
+    LOG(Trace, "AirPods advertisement received. Data: {}, Address Hash: {}, RSSI: {}",
+        Helper::ToString(adv.GetDesensitizedData()), Helper::Hash(data.address), data.rssi);
+
+    auto optUpdateEvent = _stateMgr.OnAdvReceived(std::move(adv));
     if (optUpdateEvent.has_value()) {
         OnStateChanged(std::move(optUpdateEvent.value()));
     }

@@ -1,6 +1,6 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2021-2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <functional>
 
 #include "Bluetooth.h"
@@ -119,8 +120,6 @@ public:
     std::optional<UpdateEvent> OnAdvReceived(Advertisement adv);
     void Disconnect();
 
-    void OnRssiMinChanged(int16_t rssiMin);
-
 private:
     using Clock = std::chrono::steady_clock;
     using Timestamp = std::chrono::time_point<Clock>;
@@ -131,7 +130,6 @@ private:
     Helper::Sides<Helper::Timer> _stateResetTimer;
     Helper::Sides<std::optional<std::pair<Advertisement, Timestamp>>> _adv;
     std::optional<State> _cachedState;
-    int16_t _rssiMin{std::numeric_limits<int16_t>::max()};
 
     bool IsPossibleDesiredAdv(const Advertisement &adv) const;
     void UpdateAdv(Advertisement adv);
@@ -151,7 +149,6 @@ public:
     void StartScanner();
     void StopScanner();
 
-    void OnRssiMinChanged(int16_t rssiMin);
     void OnAutomaticEarDetectionChanged(bool enable);
     void OnBoundDeviceAddressChanged(uint64_t address);
 
@@ -162,7 +159,9 @@ private:
     std::optional<Bluetooth::Device> _boundDevice;
     QString _deviceName;
     bool _deviceConnected{false};
-    bool _automaticEarDetection{false};
+    std::atomic<bool> _automaticEarDetection{false};
+    Helper::Timer _inEarDebounceTimer;
+    std::atomic<bool> _lastReportedBothInEar{false};
 
     void OnBoundDeviceConnectionStateChanged(Bluetooth::DeviceState state);
     void OnStateChanged(Details::StateManager::UpdateEvent updateEvent);

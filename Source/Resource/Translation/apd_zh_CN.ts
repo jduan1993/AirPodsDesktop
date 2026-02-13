@@ -275,16 +275,16 @@ You need to pair your AirPods in Windows Bluetooth Settings first.</source>
         <translation>关于</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open source &lt;a href=&quot;https://github.com/SpriteOvO/AirPodsDesktop&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;repository&lt;/span&gt;&lt;/a&gt; and licensed under &lt;a href=&quot;https://github.com/SpriteOvO/AirPodsDesktop/blob/main/LICENSE&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;GPLv3&lt;/span&gt;&lt;/a&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;开源 &lt;a href=&quot;https://github.com/SpriteOvO/AirPodsDesktop&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;仓库&lt;/span&gt;&lt;/a&gt; 根据 &lt;a href=&quot;https://github.com/SpriteOvO/AirPodsDesktop/blob/main/LICENSE&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;GPLv3&lt;/span&gt;&lt;/a&gt; 许可。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open source &lt;a href=&quot;https://github.com/jduan1993/AirPodsDesktop&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;repository&lt;/span&gt;&lt;/a&gt; and licensed under &lt;a href=&quot;https://github.com/jduan1993/AirPodsDesktop/blob/main/LICENSE&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;GPLv3&lt;/span&gt;&lt;/a&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;开源 &lt;a href=&quot;https://github.com/jduan1993/AirPodsDesktop&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;仓库&lt;/span&gt;&lt;/a&gt; 根据 &lt;a href=&quot;https://github.com/jduan1993/AirPodsDesktop/blob/main/LICENSE&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;GPLv3&lt;/span&gt;&lt;/a&gt; 许可。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Language</source>
         <translation>语言</translation>
     </message>
     <message>
-        <source>Copyright © 2021-2022 SpriteOvO. All rights reserved.</source>
-        <translation>版权所有 © 2021-2022 SpriteOvO. 保留所有权利。</translation>
+        <source>Copyright © 2021-2026 Hugo Duan. All rights reserved.</source>
+        <translation>版权所有 © 2021-2026 Hugo Duan. 保留所有权利。</translation>
     </message>
     <message>
         <source>Display battery on taskbar</source>

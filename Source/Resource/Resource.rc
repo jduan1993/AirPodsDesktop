@@ -78,7 +78,7 @@ BEGIN
     BEGIN
         BLOCK "080004b0"
         BEGIN
-            VALUE "CompanyName", "SpriteOvO"
+            VALUE "CompanyName", "Hugo Duan"
             VALUE "FileDescription", CONFIG_DESCRIPTION
             VALUE "FileVersion", CONFIG_WINRC_VERSION_STRING
             VALUE "InternalName", CONFIG_PROGRAM_NAME ".exe"

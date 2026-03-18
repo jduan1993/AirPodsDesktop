@@ -393,7 +393,7 @@
          <item>
           <widget class="QLabel" name="label_4">
            <property name="text">
-            <string>Copyright © 2021-2026 Hugo Duan. All rights reserved.</string>
+            <string>Copyright © 2021-2022 SpriteOvO, 2026 Hugo Duan. All rights reserved.</string>
            </property>
           </widget>
          </item>

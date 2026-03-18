@@ -283,8 +283,8 @@ You need to pair your AirPods in Windows Bluetooth Settings first.</source>
         <translation>语言</translation>
     </message>
     <message>
-        <source>Copyright © 2021-2026 Hugo Duan. All rights reserved.</source>
-        <translation>版权所有 © 2021-2026 Hugo Duan. 保留所有权利。</translation>
+        <source>Copyright © 2021-2022 SpriteOvO, 2026 Hugo Duan. All rights reserved.</source>
+        <translation>版权所有 © 2021-2022 SpriteOvO, 2026 Hugo Duan. 保留所有权利。</translation>
     </message>
     <message>
         <source>Display battery on taskbar</source>

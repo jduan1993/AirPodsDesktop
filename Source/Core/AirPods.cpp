@@ -1,6 +1,7 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2026 Hugo Duan
+// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,8 +23,11 @@
 #include <chrono>
 #include <thread>
 #include <QVector>
+#include <QTimer>
 #include <QMetaObject>
+#include <QMessageBox>
 
+#include <Config.h>
 #include "Bluetooth.h"
 #include "GlobalMedia.h"
 #include "../Helper.h"
@@ -67,8 +71,6 @@ Advertisement::Advertisement(const Bluetooth::AdvertisementWatcher::ReceivedData
     _protocol = std::move(protocol.value());
 
     // Store state
-    //
-
     _state.model = _protocol.GetModel();
     _state.side = _protocol.GetBroadcastedSide();
 
@@ -140,20 +142,27 @@ const std::vector<uint8_t> &Advertisement::GetMfrData() const
 
 StateManager::StateManager()
 {
-    _lostTimer.Start(10s, [this] {
+    _lostTimer.Start(20s, [this] {
         std::lock_guard<std::mutex> lock{_mutex};
         DoLost();
     });
 
-    _stateResetTimer.left.Start(10s, [this] {
+    _stateResetTimer.left.Start(20s, [this] {
         std::lock_guard<std::mutex> lock{_mutex};
         DoStateReset(Side::Left);
     });
 
-    _stateResetTimer.right.Start(10s, [this] {
+    _stateResetTimer.right.Start(20s, [this] {
         std::lock_guard<std::mutex> lock{_mutex};
         DoStateReset(Side::Right);
     });
+}
+
+StateManager::~StateManager()
+{
+    _lostTimer.Stop();
+    _stateResetTimer.left.Stop();
+    _stateResetTimer.right.Stop();
 }
 
 std::optional<State> StateManager::GetCurrentState() const
@@ -167,7 +176,6 @@ auto StateManager::OnAdvReceived(Advertisement adv) -> std::optional<UpdateEvent
     std::lock_guard<std::mutex> lock{_mutex};
 
     if (!IsPossibleDesiredAdv(adv)) {
-        LOG(Warn, "This adv may not be broadcast from the device we desire.");
         return std::nullopt;
     }
 
@@ -178,78 +186,51 @@ auto StateManager::OnAdvReceived(Advertisement adv) -> std::optional<UpdateEvent
 void StateManager::Disconnect()
 {
     std::lock_guard<std::mutex> lock{_mutex};
-
-    LOG(Info, "StateManager: Disconnect.");
+    LOG(Info, "StateManager: Explicit Disconnect.");
     ResetAll();
 }
 
 bool StateManager::IsPossibleDesiredAdv(const Advertisement &adv) const
 {
     const auto &advState = adv.GetAdvState();
-
     auto &lastAdv = advState.side == Side::Left ? _adv.left : _adv.right;
 
-    // If the Random Non-resolvable Address of our devices is changed
-    // or the packet is sent from another device that it isn't ours
-    //
     if (lastAdv.has_value() && lastAdv->first.GetAddress() != adv.GetAddress()) {
         const auto &lastAdvState = lastAdv->first.GetAdvState();
-
-        if (advState.model != lastAdvState.model) {
-            LOG(Warn, "IsPossibleDesiredAdv returns false. Reason: model new='{}' old='{}'",
-                Helper::ToString(advState.model), Helper::ToString(lastAdvState.model));
+        if (advState.model != lastAdvState.model)
             return false;
-        }
 
-        Battery::ValueType leftBatteryDiff = 0, rightBatteryDiff = 0, caseBatteryDiff = 0;
+        Battery::ValueType leftDiff = 0, rightDiff = 0, caseDiff = 0;
+        using SignedVal = std::make_signed_t<Battery::ValueType>;
 
-        using SignedBatteryValueT = std::make_signed_t<Battery::ValueType>;
-
-        if (advState.pods.left.battery.Available() && lastAdvState.pods.left.battery.Available()) {
-            leftBatteryDiff = std::abs(
-                static_cast<SignedBatteryValueT>(advState.pods.left.battery.Value()) -
-                static_cast<SignedBatteryValueT>(lastAdvState.pods.left.battery.Value()));
-        }
+        if (advState.pods.left.battery.Available() && lastAdvState.pods.left.battery.Available())
+            leftDiff = std::abs(
+                static_cast<SignedVal>(advState.pods.left.battery.Value()) -
+                static_cast<SignedVal>(lastAdvState.pods.left.battery.Value()));
         if (advState.pods.right.battery.Available() && lastAdvState.pods.right.battery.Available())
-        {
-            rightBatteryDiff = std::abs(
-                static_cast<SignedBatteryValueT>(advState.pods.right.battery.Value()) -
-                static_cast<SignedBatteryValueT>(lastAdvState.pods.right.battery.Value()));
-        }
-        if (advState.caseBox.battery.Available() && lastAdvState.caseBox.battery.Available()) {
-            caseBatteryDiff = std::abs(
-                static_cast<SignedBatteryValueT>(advState.caseBox.battery.Value()) -
-                static_cast<SignedBatteryValueT>(lastAdvState.caseBox.battery.Value()));
-        }
+            rightDiff = std::abs(
+                static_cast<SignedVal>(advState.pods.right.battery.Value()) -
+                static_cast<SignedVal>(lastAdvState.pods.right.battery.Value()));
+        if (advState.caseBox.battery.Available() && lastAdvState.caseBox.battery.Available())
+            caseDiff = std::abs(
+                static_cast<SignedVal>(advState.caseBox.battery.Value()) -
+                static_cast<SignedVal>(lastAdvState.caseBox.battery.Value()));
 
-        // The battery changes in steps of 1, so the data of two packets in a short time
-        // can not exceed 5 (relaxed from 1), otherwise it is not our device
-        //
-        if (leftBatteryDiff > 5 || rightBatteryDiff > 5 || caseBatteryDiff > 5) {
-            LOG(Warn,
-                "IsPossibleDesiredAdv returns false. Reason: BatteryDiff l='{}' r='{}' c='{}'",
-                leftBatteryDiff, rightBatteryDiff, caseBatteryDiff);
+        if (leftDiff > 5 || rightDiff > 5 || caseDiff > 5)
             return false;
-        }
-
-        LOG(Info, "Address changed from {} to {}, but it looks like the same device.", 
-            Helper::Hash(lastAdv->first.GetAddress()), Helper::Hash(adv.GetAddress()));
     }
-
     return true;
 }
 
 void StateManager::UpdateAdv(Advertisement adv)
 {
     _lostTimer.Reset();
-
     const auto &advState = adv.GetAdvState();
-
     if (advState.side == Side::Left) {
         _stateResetTimer.left.Reset();
         _adv.left = std::make_pair(std::move(adv), Clock::now());
     }
-    else if (advState.side == Side::Right) {
+    else {
         _stateResetTimer.right.Reset();
         _adv.right = std::make_pair(std::move(adv), Clock::now());
     }
@@ -257,44 +238,37 @@ void StateManager::UpdateAdv(Advertisement adv)
 
 auto StateManager::UpdateState() -> std::optional<UpdateEvent>
 {
-    Helper::Sides<std::pair<Advertisement::AdvState, Timestamp>> cachedAdvState;
+    auto pickSide = [&](auto available_cond_fn) -> std::optional<Advertisement::AdvState> {
+        bool leftAvailable =
+            _adv.left.has_value() && available_cond_fn(_adv.left->first.GetAdvState());
+        bool rightAvailable =
+            _adv.right.has_value() && available_cond_fn(_adv.right->first.GetAdvState());
 
-    if (_adv.left.has_value()) {
-        cachedAdvState.left = std::make_pair(_adv.left->first.GetAdvState(), _adv.left->second);
-    }
-    if (_adv.right.has_value()) {
-        cachedAdvState.right = std::make_pair(_adv.right->first.GetAdvState(), _adv.right->second);
-    }
-
-    State newState;
-
-#define PICK_SIDE(available_condition_with_field)                                                  \
-    [&]() -> decltype(auto) {                                                                      \
-        const Helper::Sides<bool> available = {                                                    \
-            .left = cachedAdvState.left.first.available_condition_with_field,                      \
-            .right = cachedAdvState.right.first.available_condition_with_field,                    \
-        };                                                                                         \
-        if (available.left && available.right) {                                                   \
-            return cachedAdvState.left.second > cachedAdvState.right.second                        \
-                       ? cachedAdvState.left.first                                                 \
-                       : cachedAdvState.right.first;                                               \
-        }                                                                                          \
-        else {                                                                                     \
-            return available.left ? cachedAdvState.left.first : cachedAdvState.right.first;        \
-        }                                                                                          \
-    }()
-
-    newState.model = PICK_SIDE(model != Model::Unknown).model;
-    newState.pods.left = std::move(PICK_SIDE(pods.left.battery.Available()).pods.left);
-    newState.pods.right = std::move(PICK_SIDE(pods.right.battery.Available()).pods.right);
-    newState.caseBox = std::move(PICK_SIDE(caseBox.battery.Available()).caseBox);
-
-#undef PICK_SIDE
-
-    if (newState == _cachedState) {
+        if (leftAvailable && rightAvailable) {
+            return (_adv.left->second > _adv.right->second) ? _adv.left->first.GetAdvState()
+                                                            : _adv.right->first.GetAdvState();
+        }
+        if (leftAvailable)
+            return _adv.left->first.GetAdvState();
+        if (rightAvailable)
+            return _adv.right->first.GetAdvState();
         return std::nullopt;
-    }
+    };
 
+    // Maintain state continuity by inheriting from cache
+    State newState = _cachedState.value_or(State{});
+
+    if (auto s = pickSide([](const auto &s) { return s.model != Model::Unknown; }))
+        newState.model = s->model;
+    if (auto s = pickSide([](const auto &s) { return s.pods.left.battery.Available(); }))
+        newState.pods.left = s->pods.left;
+    if (auto s = pickSide([](const auto &s) { return s.pods.right.battery.Available(); }))
+        newState.pods.right = s->pods.right;
+    if (auto s = pickSide([](const auto &s) { return s.caseBox.battery.Available(); }))
+        newState.caseBox = s->caseBox;
+
+    if (newState == _cachedState)
+        return std::nullopt;
     auto oldState = std::move(_cachedState);
     _cachedState = std::move(newState);
 
@@ -303,10 +277,6 @@ auto StateManager::UpdateState() -> std::optional<UpdateEvent>
 
 void StateManager::ResetAll()
 {
-    if (_cachedState.has_value()) {
-        ApdApp->GetMainWindow()->DisconnectSafely();
-    }
-
     _adv.left.reset();
     _adv.right.reset();
     _cachedState.reset();
@@ -315,17 +285,24 @@ void StateManager::ResetAll()
 void StateManager::DoLost()
 {
     if (_cachedState.has_value()) {
-        LOG(Info, "StateManager: Device is lost.");
+        LOG(Info, "StateManager: Data stream lost (20s), clearing state.");
+        _adv.left.reset();
+        _adv.right.reset();
+        auto event = UpdateState();
+        if (event && _cbStateChanged)
+            _cbStateChanged(*event);
     }
-    ResetAll();
 }
 
 void StateManager::DoStateReset(Side side)
 {
     auto &adv = side == Side::Left ? _adv.left : _adv.right;
     if (adv.has_value()) {
-        LOG(Info, "StateManager: DoStateReset called. Side: {}", Helper::ToString(side));
+        LOG(Info, "StateManager: Side {} reset due to timeout.", Helper::ToString(side));
         adv.reset();
+        auto event = UpdateState();
+        if (event && _cbStateChanged)
+            _cbStateChanged(*event);
     }
 }
 } // namespace Details
@@ -336,15 +313,22 @@ void StateManager::DoStateReset(Side side)
 
 Manager::Manager()
 {
-    _adWatcher.CbReceived() += [this](auto &&...args) {
-        std::lock_guard<std::mutex> lock{_mutex};
-        OnAdvertisementReceived(std::forward<decltype(args)>(args)...);
-    };
-
+    _stateMgr.SetCallback([this](auto event) { OnStateChanged(std::move(event)); });
+    _adWatcher.CbReceived() +=
+        [this](auto &&...args) { OnAdvertisementReceived(std::forward<decltype(args)>(args)...); };
     _adWatcher.CbStateChanged() += [this](auto &&...args) {
         std::lock_guard<std::mutex> lock{_mutex};
         OnAdvWatcherStateChanged(std::forward<decltype(args)>(args)...);
     };
+
+    // BLE Watchdog: Check health every 5s
+    _bleWatchdogTimer.Start(5s, [this] { CheckBleHealth(); });
+}
+
+Manager::~Manager()
+{
+    _bleWatchdogTimer.Stop();
+    _inEarDebounceTimer.Stop();
 }
 
 void Manager::StartScanner()
@@ -353,162 +337,222 @@ void Manager::StartScanner()
         LOG(Warn, "Bluetooth AdvWatcher start failed.");
     }
     else {
-        LOG(Info, "Bluetooth AdvWatcher start succeeded.");
+        LOG(Info, "Bluetooth AdvWatcher started.");
     }
 }
 
 void Manager::StopScanner()
 {
     if (!_adWatcher.Stop()) {
-        LOG(Warn, "AsyncScanner::Stop() failed.");
+        LOG(Warn, "Bluetooth AdvWatcher stop failed.");
     }
     else {
-        LOG(Info, "AsyncScanner::Stop() succeeded.");
+        LOG(Info, "Bluetooth AdvWatcher stopped.");
     }
 }
 
 void Manager::OnAutomaticEarDetectionChanged(bool enable)
 {
-    std::lock_guard<std::mutex> lock{_mutex};
     _automaticEarDetection = enable;
 }
 
 void Manager::OnBoundDeviceAddressChanged(uint64_t address)
 {
     std::unique_lock<std::mutex> lock{_mutex};
-
     _boundDevice.reset();
     _deviceConnected = false;
+    this->_lastReportedInEar = false;
     _stateMgr.Disconnect();
 
-    // Unbind device
-    //
+    // Reset Watchdog on device change
+    auto now = std::chrono::steady_clock::now();
+    _lastAdvTime = now;
+    _connectedAt = now;
+    _bleHealthy = true;
+    _recoveryStage = 0;
+    _bleMissCount = 0;
+
     if (address == 0) {
-        LOG(Info, "Unbind device.");
+        LOG(Info, "Device address cleared (unbound).");
         return;
     }
 
-    // Bind to a new device
-    //
-    LOG(Info, "Bind a new device.");
-
     auto optDevice = Bluetooth::DeviceManager::FindDevice(address);
     if (!optDevice.has_value()) {
-        LOG(Error, "Find device by address failed.");
+        LOG(Error, "Device binding failed: Bluetooth address {} not found in system paired list.",
+            address);
+        QMessageBox::warning(nullptr, Config::ProgramName, QObject::tr("No paired device found."));
         return;
     }
 
     _boundDevice = std::move(optDevice);
-
     _deviceName = QString::fromStdString(_boundDevice->GetName());
-
     _boundDevice->CbConnectionStatusChanged() += [this](auto &&...args) {
         std::lock_guard<std::mutex> lock{_mutex};
         OnBoundDeviceConnectionStateChanged(std::forward<decltype(args)>(args)...);
     };
-
+    LOG(Info, "Successfully bound to device: '{}' ({})", _deviceName.toStdString(), address);
     OnBoundDeviceConnectionStateChanged(_boundDevice->GetConnectionState());
 }
 
 void Manager::OnBoundDeviceConnectionStateChanged(Bluetooth::DeviceState state)
 {
-    bool newDeviceConnected = state == Bluetooth::DeviceState::Connected;
-    bool doDisconnect = _deviceConnected && !newDeviceConnected;
-    _deviceConnected = newDeviceConnected;
+    bool newConnected = (state == Bluetooth::DeviceState::Connected);
+    if (_deviceConnected != newConnected) {
+        _deviceConnected = newConnected;
+        LOG(Info, "System Connection changed: Connected={}", bool(_deviceConnected));
+        
+        // Reset Watchdog state and record connection time
+        auto now = std::chrono::steady_clock::now();
+        _recoveryStage = 0;
+        _bleHealthy = true;
+        _lastAdvTime = now;
+        _connectedAt = now;
+        _bleMissCount = 0;
 
-    if (doDisconnect) {
-        _stateMgr.Disconnect();
+        if (!_deviceConnected) {
+            this->_lastReportedInEar = false;
+            _stateMgr.Disconnect();
+            ApdApp->GetMainWindow()->DisconnectSafely();
+        }
+        else if (_boundDevice.has_value()) {
+            State forceState;
+            forceState.model = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
+            forceState.displayName = _deviceName;
+            ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
+        }
     }
-    else if (_deviceConnected && !_stateMgr.GetCurrentState().has_value() && _boundDevice.has_value()) {
-        // If system connected but no advertisement received yet, 
-        // force a basic connected state to show the UI with correct model
-        State forceState;
-        forceState.model = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
-        forceState.displayName = _deviceName.isEmpty() ? "AirPods" : _deviceName;
-        ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
-        LOG(Info, "Forcing connected state for model: {}", Helper::ToUnderlying(forceState.model));
+}
+
+void Manager::LogStateChanges(const std::optional<State> &oldState, const State &newState)
+{
+    auto bVal = [](const Battery &b) { return b.Available() ? std::to_string(b.Value()) : "N/A"; };
+
+    if (!oldState.has_value()) {
+        LOG(Info,
+            "[Initial State] Lid:{}, BothInCase:{}, L:(B:{}%, C:{}, E:{}), R:(B:{}%, C:{}, E:{}), "
+            "Case:(B:{}%, C:{})",
+            newState.caseBox.isLidOpened ? "Open" : "Closed",
+            newState.caseBox.isBothPodsInCase ? "Yes" : "No", bVal(newState.pods.left.battery),
+            newState.pods.left.isCharging, newState.pods.left.isInEar,
+            bVal(newState.pods.right.battery), newState.pods.right.isCharging,
+            newState.pods.right.isInEar, bVal(newState.caseBox.battery),
+            newState.caseBox.isCharging);
+        return;
     }
 
-    LOG(Info, "The device we bound is updated. current: {}, new: {}", _deviceConnected,
-        newDeviceConnected);
+    const auto &os = oldState.value();
+    const auto &ns = newState;
+
+    if (os.caseBox.isLidOpened != ns.caseBox.isLidOpened)
+        LOG(Info, "[Lid] {}", ns.caseBox.isLidOpened ? "Opened" : "Closed");
+
+    if (os.caseBox.isBothPodsInCase != ns.caseBox.isBothPodsInCase)
+        LOG(Info, "[Case] Pods are now: {}",
+            ns.caseBox.isBothPodsInCase ? "Both inside case" : "Removed from case");
+
+    if (os.pods.left.isInEar != ns.pods.left.isInEar)
+        LOG(Info, "[In-Ear] Left Pod: {}", ns.pods.left.isInEar ? "Worn" : "Removed");
+    if (os.pods.right.isInEar != ns.pods.right.isInEar)
+        LOG(Info, "[In-Ear] Right Pod: {}", ns.pods.right.isInEar ? "Worn" : "Removed");
+
+    if (os.pods.left.battery != ns.pods.left.battery ||
+        os.pods.left.isCharging != ns.pods.left.isCharging)
+        LOG(Info, "[Power] Left Pod: {}% ({})", bVal(ns.pods.left.battery),
+            ns.pods.left.isCharging ? "Charging" : "Discharging");
+    if (os.pods.right.battery != ns.pods.right.battery ||
+        os.pods.right.isCharging != ns.pods.right.isCharging)
+        LOG(Info, "[Power] Right Pod: {}% ({})", bVal(ns.pods.right.battery),
+            ns.pods.right.isCharging ? "Charging" : "Discharging");
+    if (os.caseBox.battery != ns.caseBox.battery || os.caseBox.isCharging != ns.caseBox.isCharging)
+        LOG(Info, "[Power] Case: {}% ({})", bVal(ns.caseBox.battery),
+            ns.caseBox.isCharging ? "Charging" : "Discharging");
 }
 
 void Manager::OnStateChanged(Details::StateManager::UpdateEvent updateEvent)
 {
-    const auto &oldState = updateEvent.oldState;
-    auto &newState = updateEvent.newState;
+    if (!_deviceConnected)
+        return;
 
-    newState.displayName =
-        _deviceName.isEmpty() ? Helper::ToString(newState.model) : _deviceName.remove(" - Find My");
+    LogStateChanges(updateEvent.oldState, updateEvent.newState);
+
+    auto &newState = updateEvent.newState;
+    QString deviceNameSnapshot;
+    {
+        std::lock_guard<std::mutex> lock{_mutex};
+        deviceNameSnapshot = _deviceName;
+    }
+
+    if (!deviceNameSnapshot.isEmpty()) {
+        deviceNameSnapshot.remove(" - Find My");
+        newState.displayName = deviceNameSnapshot;
+    }
+    else {
+        newState.displayName = Helper::ToString(newState.model);
+    }
 
     ApdApp->GetMainWindow()->UpdateStateSafely(newState);
 
-    // Lid opened
-    //
     bool newLidOpened = newState.caseBox.isLidOpened && newState.caseBox.isBothPodsInCase;
-    bool lidStateSwitched;
-    if (!oldState.has_value()) {
-        lidStateSwitched = newLidOpened;
-    }
-    else {
-        bool oldLidOpened = oldState->caseBox.isLidOpened && oldState->caseBox.isBothPodsInCase;
-        lidStateSwitched = oldLidOpened != newLidOpened;
-    }
-    if (lidStateSwitched) {
+    if (!updateEvent.oldState.has_value() ||
+        (updateEvent.oldState->caseBox.isLidOpened != newState.caseBox.isLidOpened))
         OnLidOpened(newLidOpened);
+
+    if (!updateEvent.oldState.has_value()) {
+        bool newAnyInEar = newState.pods.left.isInEar || newState.pods.right.isInEar;
+        this->_lastReportedInEar = !newAnyInEar;
+        LOG(Debug, "System Consistency: State recovered. AnyInEar={}, SyncFlag={}", newAnyInEar,
+            bool(this->_lastReportedInEar));
     }
 
-    // In-ear state detection
-    // Logic: 
-    // - Play if ANY pod is in ear (and was previously none).
-    // - Pause if BOTH pods are out of ear (and was previously any).
-    //
-    if (oldState.has_value()) {
-        bool oldAnyInEar = oldState->pods.left.isInEar || oldState->pods.right.isInEar;
-        bool newAnyInEar = newState.pods.left.isInEar || newState.pods.right.isInEar;
-        
-        if (oldAnyInEar != newAnyInEar) {
-            OnBothInEar(newAnyInEar);
-        }
-    }
-    else {
-        // Initial state after connection
-        bool newAnyInEar = newState.pods.left.isInEar || newState.pods.right.isInEar;
-        OnBothInEar(newAnyInEar);
-    }
+    OnBothInEar(newState);
 }
 
 void Manager::OnLidOpened(bool opened)
 {
-    auto &mainWindow = ApdApp->GetMainWindow();
-    if (opened) {
-        mainWindow->ShowSafely();
-    }
-    else {
-        mainWindow->HideSafely();
-    }
+    auto &mw = ApdApp->GetMainWindow();
+    if (opened)
+        mw->ShowSafely();
+    else
+        mw->HideSafely();
 }
 
-void Manager::OnBothInEar(bool isBothInEar)
+void Manager::OnBothInEar(const State &state)
 {
-    if (isBothInEar) {
-        // If both in ear, play immediately and cancel any pending pause timer
+    bool isAnyInEar = state.pods.left.isInEar || state.pods.right.isInEar;
+
+    if (isAnyInEar) {
         _inEarDebounceTimer.Stop();
-        if (!_lastReportedBothInEar.exchange(true)) {
+        if (!this->_lastReportedInEar.exchange(true)) {
             if (_automaticEarDetection) {
-                LOG(Info, "automatic_ear_detection: Earbud in ear detected, playing immediately.");
+                LOG(Info, "[Action] Trigger Play - Any pod in ear.");
                 Core::GlobalMedia::Play();
             }
         }
     }
     else {
-        // If not both in ear, start a debounce timer before pausing
-        if (_lastReportedBothInEar) {
-            _inEarDebounceTimer.Start(500ms, [this] {
-                // No lock here to avoid deadlock with Stop() called under _mutex
-                if (_lastReportedBothInEar.exchange(false)) {
+        // Optimization: Multi-signal fusion for immediate pause
+        // Level 1 & 2: Strong signals for immediate pause
+        bool bothInCase = state.caseBox.isBothPodsInCase;
+        bool bothCharging = state.pods.left.isCharging && state.pods.right.isCharging;
+
+        if (bothInCase || bothCharging) {
+            if (_lastReportedInEar.exchange(false)) {
+                _inEarDebounceTimer.Stop();
+                if (_automaticEarDetection) {
+                    LOG(Info, "[Action] Immediate Pause - Pods returned to case (Fusion: InCase={}, Charging={}).", bothInCase, bothCharging);
+                    Core::GlobalMedia::Pause();
+                }
+            }
+            return;
+        }
+
+        // Level 3: Weak/Jittery signal, use 10s debounce
+        if (this->_lastReportedInEar) {
+            _inEarDebounceTimer.Start(10s, [this] {
+                if (this->_lastReportedInEar.exchange(false)) {
                     if (_automaticEarDetection) {
-                        LOG(Info, "automatic_ear_detection: Debounce timeout, pausing music.");
+                        LOG(Info, "[Action] Trigger Pause - All pods out (10s confirmed).");
                         Core::GlobalMedia::Pause();
                     }
                 }
@@ -517,81 +561,130 @@ void Manager::OnBothInEar(bool isBothInEar)
     }
 }
 
-bool Manager::OnAdvertisementReceived(const Bluetooth::AdvertisementWatcher::ReceivedData &data)
+void Manager::CheckBleHealth()
 {
-    if (!Details::Advertisement::IsDesiredAdv(data)) {
-        return false;
+    if (!_deviceConnected)
+        return;
+
+    auto now = std::chrono::steady_clock::now();
+    
+    // Grace period: Skip health check for the first 15s after connection
+    if (now - _connectedAt < 15s)
+        return;
+
+    auto last = _lastAdvTime.load();
+
+    // 10s Threshold for "No BLE Data" while connected
+    if (now - last > 10s) {
+        _bleMissCount++;
+        if (_bleHealthy) {
+            LOG(Warn, "BLE Watchdog: No data for 10s (Miss count: {}).", (int)_bleMissCount);
+            _bleHealthy = false;
+        }
+        
+        // Require 2 consecutive misses (effectively 15-20s of no data) before recovery
+        if (_bleMissCount >= 2) {
+            TryRecover();
+        }
+    } else {
+        _bleMissCount = 0;
+    }
+}
+
+void Manager::TryRecover()
+{
+    // Stage 1: Restart BLE Scanner (Internal)
+    if (_recoveryStage == 0) {
+        LOG(Warn, "[Recovery Stage 1] Restarting BLE scanner...");
+        StopScanner();
+        StartScanner();
+        _recoveryStage = 1;
+        return;
     }
 
-    Details::Advertisement adv{data};
-
-    if (!_deviceConnected) {
-        return false;
-    }
-
-    // Strict filtering: Only process advertisements that match our bound device's model
-    if (_boundDevice.has_value()) {
-        Model boundModel = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
-        if (boundModel != Model::Unknown && adv.GetAdvState().model != boundModel) {
-            return false;
+    if (_recoveryStage >= 1) {
+        // Note: Stage 2 (System Reconnection) is not directly supported by current Device API.
+        // Stage 3: Give up to prevent flapping, wait for manual action or next valid Adv
+        static auto lastErrorLog = std::chrono::steady_clock::now();
+        if (std::chrono::steady_clock::now() - lastErrorLog > 1min) {
+            LOG(Error, "[Recovery] BLE remains dead after internal scanner restart. Please check your Bluetooth driver.");
+            lastErrorLog = std::chrono::steady_clock::now();
         }
     }
+}
 
-    LOG(Trace, "AirPods advertisement received. Data: {}, Address Hash: {}, RSSI: {}",
-        Helper::ToString(adv.GetDesensitizedData()), Helper::Hash(data.address), data.rssi);
+bool Manager::OnAdvertisementReceived(const Bluetooth::AdvertisementWatcher::ReceivedData &data)
+{
+    if (!_deviceConnected)
+        return false;
 
-    auto optUpdateEvent = _stateMgr.OnAdvReceived(std::move(adv));
-    if (optUpdateEvent.has_value()) {
-        OnStateChanged(std::move(optUpdateEvent.value()));
+    // Reset Watchdog on any valid data receipt
+    auto now = std::chrono::steady_clock::now();
+    _lastAdvTime = now;
+    
+    if (!_bleHealthy) {
+        LOG(Info, "[Recovery] BLE data stream restored (Advertisement received).");
+        _bleHealthy = true;
+    }
+    
+    _recoveryStage = 0;
+    _bleMissCount = 0;
+
+    uint32_t boundProductId = 0;
+    {
+        std::lock_guard<std::mutex> lock{_mutex};
+        if (_boundDevice.has_value())
+            boundProductId = _boundDevice->GetProductId();
+    }
+
+    if (!Details::Advertisement::IsDesiredAdv(data))
+        return false;
+    Details::Advertisement adv{data};
+
+    if (boundProductId != 0) {
+        Model boundModel = AppleCP::AirPods::GetModel(boundProductId);
+        if (boundModel != Model::Unknown && adv.GetAdvState().model != boundModel)
+            return false;
+    }
+
+    auto event = _stateMgr.OnAdvReceived(std::move(adv));
+    if (event) {
+        OnStateChanged(std::move(*event));
     }
     return true;
 }
 
 void Manager::OnAdvWatcherStateChanged(
-    Bluetooth::AdvertisementWatcher::State state, const std::optional<std::string> &optError)
+    Bluetooth::AdvertisementWatcher::State state, const std::optional<std::string> &error)
 {
-    switch (state) {
-    case Core::Bluetooth::AdvertisementWatcher::State::Started:
+    if (state == Core::Bluetooth::AdvertisementWatcher::State::Started) {
         ApdApp->GetMainWindow()->AvailableSafely();
-        LOG(Info, "Bluetooth AdvWatcher started.");
-        break;
-
-    case Core::Bluetooth::AdvertisementWatcher::State::Stopped:
+    }
+    else if (state == Core::Bluetooth::AdvertisementWatcher::State::Stopped) {
         ApdApp->GetMainWindow()->UnavailableSafely();
-        LOG(Warn, "Bluetooth AdvWatcher stopped. Error: '{}'.", optError.value_or("nullopt"));
-        break;
+        if (error.has_value()) {
+            LOG(Error, "Bluetooth Watcher stopped: {}. Throttling restart...", *error);
 
-    default:
-        FatalError("Unhandled adv watcher state: '{}'", Helper::ToUnderlying(state));
+            auto now = std::chrono::steady_clock::now();
+            if (now - _lastScannerRestart > 5s) {
+                _lastScannerRestart = now;
+                QMetaObject::invokeMethod(ApdApp, [this] { StartScanner(); }, Qt::QueuedConnection);
+            }
+        }
     }
 }
 
 std::vector<Bluetooth::Device> GetDevices()
 {
-    std::vector<Bluetooth::Device> devices =
-        Bluetooth::DeviceManager::GetDevicesByState(Bluetooth::DeviceState::Paired);
-
-    LOG(Info, "Paired devices count: {}", devices.size());
-
+    auto devices = Bluetooth::DeviceManager::GetDevicesByState(Bluetooth::DeviceState::Paired);
     devices.erase(
         std::remove_if(
             devices.begin(), devices.end(),
-            [](const auto &device) {
-                const auto vendorId = device.GetVendorId();
-                const auto productId = device.GetProductId();
-
-                const auto doErase =
-                    vendorId != AppleCP::VendorId ||
-                    AppleCP::AirPods::GetModel(productId) == AirPods::Model::Unknown;
-
-                LOG(Trace, "Device VendorId: '{}', ProductId: '{}', doErase: {}", vendorId,
-                    productId, doErase);
-
-                return doErase;
+            [](const auto &d) {
+                return d.GetVendorId() != AppleCP::VendorId ||
+                       AppleCP::AirPods::GetModel(d.GetProductId()) == AirPods::Model::Unknown;
             }),
         devices.end());
-
-    LOG(Info, "AirPods devices count: {} (filtered)", devices.size());
     return devices;
 }
 

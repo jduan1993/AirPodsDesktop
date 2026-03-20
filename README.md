@@ -27,30 +27,35 @@
 ![Preview Image](/Assets/Preview.gif)
 
 ## ✨ Features
-#### v0.5.0 (Current)
-* 🛡️ **Smarter In-Ear Detection**:
-  * Added 500ms debounce to effectively prevent accidental pauses caused by signal jitter.
-  * Logic optimized: Play when ANY pod is in ear; Pause ONLY when BOTH pods are removed.
-* 🔒 **Strict Device Filtering**: Automatically locks onto your bound model and simplifies usage by removing complex RSSI settings, completely ignoring interference from other devices.
-* 🚀 **Stability & Performance**: Refactored internal state management to eliminate deadlock risks, ensuring reliable media control.
-* 📦 **Installer Improvements**: Standardized app name and icon in Windows installation list, and fixed the missing installation size issue.
-
-#### v0.4.1
-* 🔋 Battery information display.
-* 👂 Automatic ear detection.
-* 🚀 Low audio latency mode.
-* 🌈 Beautiful animations.  
+#### v0.5.1 (Current)
+* 🛡️ **Smarter Media Logic (Multi-signal Fusion)**:
+  * **Back-to-Case Immediate Pause**: Fuses physical box sensor signals (`isBothPodsInCase`) with electrical charging status to trigger an instant media pause, eliminating the lag associated with long debounce timers.
+  * **Enhanced 10s Debounce**: Maintains a generous removal confirmation period for non-charging scenarios to prevent accidental pauses during signal drops or rapid repositioning.
+* 🐕 **Self-Healing BLE Watchdog**:
+  * **Fake Connection Detection**: Automatically identifies "Dead Data Streams" where the system shows "Connected" but no battery/BLE advertisements are received.
+  * **Tiered Recovery**: Implemented an automated recovery pipeline (Stage 1: Internal scanner restart; Stage 2: Diagnostic logging for Windows Bluetooth stack guidance).
+  * **Safe Grace Period**: 15s cold-start protection after connection to allow the system stack to initialize without premature intervention.
+  * **Double-Confirmation Anti-Jitter**: Requires two consecutive missed samples before triggering recovery, ensuring stability in weak signal environments.
+* 🚀 **Industrial-grade Concurrency & Safety**:
+  * **Atomic Core Flags**: Upgraded connection and detection flags to `std::atomic<bool>`.
+  * **Lifecycle Hardening**: Migrated async logic to **`QTimer::singleShot`** with application-context binding, eliminating dangling pointer (this) risks.
+  * **Lock-free Fast Path**: Achieved lock-free processing for high-frequency BLE advertisement packets, significantly reducing UI thread contention.
+* 🔒 **Memory & Data Integrity**:
+  * **Cross-thread Snapshots**: Implemented thread-safe copy mechanisms for device metadata, preventing potential data corruption in high-frequency update scenarios.
+  * **Smooth State Evolution**: State engine now inherits from the last valid snapshot, preventing the UI from flickering or jumping back to defaults during signal gaps.
+* 🛠️ **Stability Hardening**:
+  * **Comprehensive Lifecycle Management**: Explicit cleanup logic ensures all asynchronous timers stop safely upon exit.
 
 ## 🛠️ Build
-See the [Build Instructions](/Docs/Build.md).
+See [Build Instructions](/Docs/Build.md).
 
-## 🤝 Contribute
-*AirPodsDesktop* is an open source project, here are some ways you can contribute:
-* [Open an issue](https://github.com/jduan1993/AirPodsDesktop/issues/new/choose) to report bugs or suggest new features.
-* [Submit a PR](https://github.com/jduan1993/AirPodsDesktop/compare) to fix a known bug or try something from the TODO list.
-* [Translate to other languages](/CONTRIBUTING.md#-translation-guide) or [improve existing translations](/CONTRIBUTING.md#-translation-guide).
+## 🤝 Contributing
+*AirPodsDesktop* is an open-source project, and you can contribute by:
+* [Opening an issue](https://github.com/jduan1993/AirPodsDesktop/issues/new/choose) to report bugs or suggest new features.
+* [Submitting a PR](https://github.com/jduan1993/AirPodsDesktop/compare) to fix known bugs or try items in the TODO list.
+* [Translating to other languages](/CONTRIBUTING.md#-translation-guide) or [improving existing translations](/CONTRIBUTING.md#-translation-guide).
 
-## 💎 ThirdParty
+## 💎 Third Party
 * [Qt 5.15.2](https://www.qt.io/download-qt-installer) ([LGPLv3 License](https://doc.qt.io/qt-5/lgpl.html))
 * [spdlog](https://github.com/gabime/spdlog) ([MIT License](https://github.com/gabime/spdlog/blob/v1.x/LICENSE))
 * [cxxopts](https://github.com/jarro2783/cxxopts) ([MIT License](https://github.com/jarro2783/cxxopts/blob/master/LICENSE))

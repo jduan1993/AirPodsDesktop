@@ -1,6 +1,7 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
-// Copyright (C) 2021-2026 Hugo Duan
+// Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,6 +21,7 @@
 
 #include <atomic>
 #include <functional>
+#include <chrono>
 
 #include "Bluetooth.h"
 #include "AppleCP.h"
@@ -101,10 +103,6 @@ private:
     const std::vector<uint8_t> &GetMfrData() const;
 };
 
-// AirPods use Random Non-resolvable device addresses for privacy reasons. This means we
-// can't "Remember" the user's AirPods by any device property. Here we track our desired
-// devices in some non-elegant ways, but obviously it is sometimes unreliable.
-//
 class StateManager
 {
 public:
@@ -113,12 +111,20 @@ public:
         State newState;
     };
 
+    using FnStateChanged = std::function<void(UpdateEvent)>;
+
     StateManager();
+    ~StateManager();
 
     std::optional<State> GetCurrentState() const;
 
     std::optional<UpdateEvent> OnAdvReceived(Advertisement adv);
     void Disconnect();
+
+    void SetCallback(FnStateChanged cb)
+    {
+        _cbStateChanged = std::move(cb);
+    }
 
 private:
     using Clock = std::chrono::steady_clock;
@@ -130,6 +136,7 @@ private:
     Helper::Sides<Helper::Timer> _stateResetTimer;
     Helper::Sides<std::optional<std::pair<Advertisement, Timestamp>>> _adv;
     std::optional<State> _cachedState;
+    FnStateChanged _cbStateChanged;
 
     bool IsPossibleDesiredAdv(const Advertisement &adv) const;
     void UpdateAdv(Advertisement adv);
@@ -145,6 +152,7 @@ class Manager
 {
 public:
     Manager();
+    ~Manager();
 
     void StartScanner();
     void StopScanner();
@@ -158,15 +166,30 @@ private:
     Details::StateManager _stateMgr;
     std::optional<Bluetooth::Device> _boundDevice;
     QString _deviceName;
-    bool _deviceConnected{false};
-    std::atomic<bool> _automaticEarDetection{false};
-    Helper::Timer _inEarDebounceTimer;
-    std::atomic<bool> _lastReportedBothInEar{false};
 
+    // Core state flags (Atomic for thread-safety)
+    std::atomic<bool> _deviceConnected{false};
+    std::atomic<bool> _automaticEarDetection{false};
+    std::atomic<bool> _lastReportedInEar{false};
+
+    // BLE Watchdog
+    Helper::Timer _bleWatchdogTimer;
+    std::atomic<std::chrono::steady_clock::time_point> _lastAdvTime;
+    std::chrono::steady_clock::time_point _connectedAt; 
+    std::atomic<bool> _bleHealthy{true};
+    std::atomic<int> _recoveryStage{0}; // 0: Normal, 1: Scanner Restarted, 2: Device Reconnected
+    std::atomic<int> _bleMissCount{0};
+
+    Helper::Timer _inEarDebounceTimer;
+    std::chrono::steady_clock::time_point _lastScannerRestart;
+
+    void LogStateChanges(const std::optional<State> &oldState, const State &newState);
     void OnBoundDeviceConnectionStateChanged(Bluetooth::DeviceState state);
     void OnStateChanged(Details::StateManager::UpdateEvent updateEvent);
     void OnLidOpened(bool opened);
-    void OnBothInEar(bool isBothInEar);
+    void OnBothInEar(const State &state);
+    void CheckBleHealth();
+    void TryRecover();
     bool OnAdvertisementReceived(const Bluetooth::AdvertisementWatcher::ReceivedData &data);
     void OnAdvWatcherStateChanged(
         Bluetooth::AdvertisementWatcher::State state, const std::optional<std::string> &optError);

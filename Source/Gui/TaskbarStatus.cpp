@@ -1,6 +1,7 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
 // Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -313,14 +314,18 @@ void TaskbarStatus::UpdatePos(const TaskBarInfo &info, bool enable)
 void TaskbarStatus::Unavailable()
 {
     _status = Status::Unavailable;
-    _airPodsState.reset();
+    if (ApdApp->GetMainWindow() && !ApdApp->GetMainWindow()->GetApdMgr().IsConnected()) {
+        _airPodsState.reset();
+    }
     Repaint();
 }
 
 void TaskbarStatus::Disconnect()
 {
     _status = Status::Disconnected;
-    _airPodsState.reset();
+    if (ApdApp->GetMainWindow() && !ApdApp->GetMainWindow()->GetApdMgr().IsConnected()) {
+        _airPodsState.reset();
+    }
     Repaint();
 }
 

@@ -413,13 +413,17 @@ void Manager::OnBoundDeviceConnectionStateChanged(Bluetooth::DeviceState state)
         if (!_deviceConnected) {
             this->_lastReportedInEar = false;
             _stateMgr.Disconnect();
-            ApdApp->GetMainWindow()->DisconnectSafely();
+            if (ApdApp->GetMainWindow()) {
+                ApdApp->GetMainWindow()->DisconnectSafely();
+            }
         }
         else if (_boundDevice.has_value()) {
             State forceState;
             forceState.model = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
             forceState.displayName = _deviceName;
-            ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
+            if (ApdApp->GetMainWindow()) {
+                ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
+            }
         }
     }
 }
@@ -491,7 +495,9 @@ void Manager::OnStateChanged(Details::StateManager::UpdateEvent updateEvent)
         newState.displayName = Helper::ToString(newState.model);
     }
 
-    ApdApp->GetMainWindow()->UpdateStateSafely(newState);
+    if (ApdApp->GetMainWindow()) {
+        ApdApp->GetMainWindow()->UpdateStateSafely(newState);
+    }
 
     bool newLidOpened = newState.caseBox.isLidOpened && newState.caseBox.isBothPodsInCase;
     if (!updateEvent.oldState.has_value() ||
@@ -510,11 +516,13 @@ void Manager::OnStateChanged(Details::StateManager::UpdateEvent updateEvent)
 
 void Manager::OnLidOpened(bool opened)
 {
-    auto &mw = ApdApp->GetMainWindow();
-    if (opened)
-        mw->ShowSafely();
-    else
-        mw->HideSafely();
+    if (ApdApp->GetMainWindow()) {
+        auto &mw = ApdApp->GetMainWindow();
+        if (opened)
+            mw->ShowSafely();
+        else
+            mw->HideSafely();
+    }
 }
 
 void Manager::OnBothInEar(const State &state)
@@ -658,10 +666,14 @@ void Manager::OnAdvWatcherStateChanged(
     Bluetooth::AdvertisementWatcher::State state, const std::optional<std::string> &error)
 {
     if (state == Core::Bluetooth::AdvertisementWatcher::State::Started) {
-        ApdApp->GetMainWindow()->AvailableSafely();
+        if (ApdApp->GetMainWindow()) {
+            ApdApp->GetMainWindow()->AvailableSafely();
+        }
     }
     else if (state == Core::Bluetooth::AdvertisementWatcher::State::Stopped) {
-        ApdApp->GetMainWindow()->UnavailableSafely();
+        if (ApdApp->GetMainWindow()) {
+            ApdApp->GetMainWindow()->UnavailableSafely();
+        }
         if (error.has_value()) {
             LOG(Error, "Bluetooth Watcher stopped: {}. Throttling restart...", *error);
 

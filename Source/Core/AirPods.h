@@ -160,6 +160,11 @@ public:
     void OnAutomaticEarDetectionChanged(bool enable);
     void OnBoundDeviceAddressChanged(uint64_t address);
 
+    bool IsConnected() const
+    {
+        return _deviceConnected;
+    }
+
 private:
     std::mutex _mutex;
     Bluetooth::AdvertisementWatcher _adWatcher;

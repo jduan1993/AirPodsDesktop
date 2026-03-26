@@ -157,6 +157,8 @@ bool ApdApplication::Prepare(int argc, char *argv[])
     _mainWindow = std::make_unique<Gui::MainWindow>();
     _lowAudioLatencyController = std::make_unique<Core::LowAudioLatency::Controller>();
 
+    _mainWindow->Unavailable();
+
     InitSettings(settingsLoadResult);
 
     return true;

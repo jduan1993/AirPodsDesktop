@@ -1,6 +1,7 @@
 //
 // AirPodsDesktop - AirPods Desktop User Experience Enhancement Program.
 // Copyright (C) 2021-2022 SpriteOvO
+// Copyright (C) 2026 Hugo Duan
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -242,7 +243,6 @@ MainWindow::MainWindow(QWidget *parent) : QDialog{parent}
     _ui.layoutAnimation->activate();
     _videoWidget->show();
 
-    Unavailable();
     _updateChecker.Start();
 }
 
@@ -264,8 +264,14 @@ void MainWindow::Available()
     if (_status != Status::Unavailable) {
         return;
     }
-    _status = Status::Available;
-    Disconnect();
+
+    if (_apdMgr.IsConnected()) {
+        _status = Status::Updating;
+    }
+    else {
+        _status = Status::Available;
+        Disconnect();
+    }
 }
 
 void MainWindow::Unavailable()
@@ -273,7 +279,12 @@ void MainWindow::Unavailable()
     LOG(Info, "MainWindow::Unavailable");
 
     _status = Status::Unavailable;
-    _cachedState.reset();
+
+    // Only reset state if the device is not actually connected via system Bluetooth
+    if (!_apdMgr.IsConnected()) {
+        _cachedState.reset();
+    }
+
     Repaint();
     ApdApp->GetTrayIcon()->Unavailable();
     ApdApp->GetTaskbarStatus()->Unavailable();
@@ -287,7 +298,12 @@ void MainWindow::Disconnect()
         return;
     }
     _status = Status::Disconnected;
-    _cachedState.reset();
+
+    // Only reset state if the device is not actually connected via system Bluetooth
+    if (!_apdMgr.IsConnected()) {
+        _cachedState.reset();
+    }
+
     Repaint();
     ApdApp->GetTrayIcon()->Disconnect();
     ApdApp->GetTaskbarStatus()->Disconnect();

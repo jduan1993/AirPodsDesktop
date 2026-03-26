@@ -27,24 +27,18 @@
 ![Preview Image](/Assets/Preview.gif)
 
 ## ✨ Features
-#### v0.5.1 (Current)
-* 🛡️ **Smarter Media Logic (Multi-signal Fusion)**:
-  * **Back-to-Case Immediate Pause**: Fuses physical box sensor signals (`isBothPodsInCase`) with electrical charging status to trigger an instant media pause, eliminating the lag associated with long debounce timers.
-  * **Enhanced 10s Debounce**: Maintains a generous removal confirmation period for non-charging scenarios to prevent accidental pauses during signal drops or rapid repositioning.
-* 🐕 **Self-Healing BLE Watchdog**:
-  * **Fake Connection Detection**: Automatically identifies "Dead Data Streams" where the system shows "Connected" but no battery/BLE advertisements are received.
-  * **Tiered Recovery**: Implemented an automated recovery pipeline (Stage 1: Internal scanner restart; Stage 2: Diagnostic logging for Windows Bluetooth stack guidance).
-  * **Safe Grace Period**: 15s cold-start protection after connection to allow the system stack to initialize without premature intervention.
-  * **Double-Confirmation Anti-Jitter**: Requires two consecutive missed samples before triggering recovery, ensuring stability in weak signal environments.
-* 🚀 **Industrial-grade Concurrency & Safety**:
-  * **Atomic Core Flags**: Upgraded connection and detection flags to `std::atomic<bool>`.
-  * **Lifecycle Hardening**: Migrated async logic to **`QTimer::singleShot`** with application-context binding, eliminating dangling pointer (this) risks.
-  * **Lock-free Fast Path**: Achieved lock-free processing for high-frequency BLE advertisement packets, significantly reducing UI thread contention.
-* 🔒 **Memory & Data Integrity**:
-  * **Cross-thread Snapshots**: Implemented thread-safe copy mechanisms for device metadata, preventing potential data corruption in high-frequency update scenarios.
-  * **Smooth State Evolution**: State engine now inherits from the last valid snapshot, preventing the UI from flickering or jumping back to defaults during signal gaps.
-* 🛠️ **Stability Hardening**:
-  * **Comprehensive Lifecycle Management**: Explicit cleanup logic ensures all asynchronous timers stop safely upon exit.
+#### v0.5.2
+* 🔗 **Strong Consistency UI (Dual-Signal Architecture)**:
+  * **State Separation**: Fully decoupled "Connection Presence" from "Data Availability". The UI now remains in the "Connected" state as long as Windows reports the device is connected, preventing the icon from turning gray due to transient BLE advertisement loss.
+  * **Eliminated UI Flickering**: Fixed issues where the tray icon would rapidly toggle between connected/disconnected during weak signals or Watchdog background recovery.
+* 🛡️ **Enhanced Signal Resilience**:
+  * **Timeout Optimization**: Increased the data expiration threshold (`_lostTimer`) from 20s to **30s**, providing significantly better tolerance for AirPods deep sleep and environmental interference.
+  * **Controlled UI Reset**: UI state is now only fully reset upon physical system-level disconnection, ensuring visual feedback continuity.
+* ⚡ **Core Stability Fixes**:
+  * **Startup Crash Fixed**: Resolved a race condition during initialization that caused null-pointer crashes on certain systems, ensuring a robust startup experience.
+  * **Lifecycle Hardening**: Added comprehensive defensive null checks across all asynchronous callback paths.
+* 🐕 **Silent Watchdog Recovery**:
+  * Optimized the BLE Watchdog workflow to repair data streams silently in the background without triggering intrusive UI state updates.
 
 ## 🛠️ Build
 See [Build Instructions](/Docs/Build.md).

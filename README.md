@@ -27,18 +27,12 @@
 ![Preview Image](/Assets/Preview.gif)
 
 ## ✨ Features
-#### v0.5.2
-* 🔗 **Strong Consistency UI (Dual-Signal Architecture)**:
-  * **State Separation**: Fully decoupled "Connection Presence" from "Data Availability". The UI now remains in the "Connected" state as long as Windows reports the device is connected, preventing the icon from turning gray due to transient BLE advertisement loss.
-  * **Eliminated UI Flickering**: Fixed issues where the tray icon would rapidly toggle between connected/disconnected during weak signals or Watchdog background recovery.
-* 🛡️ **Enhanced Signal Resilience**:
-  * **Timeout Optimization**: Increased the data expiration threshold (`_lostTimer`) from 20s to **30s**, providing significantly better tolerance for AirPods deep sleep and environmental interference.
-  * **Controlled UI Reset**: UI state is now only fully reset upon physical system-level disconnection, ensuring visual feedback continuity.
-* ⚡ **Core Stability Fixes**:
-  * **Startup Crash Fixed**: Resolved a race condition during initialization that caused null-pointer crashes on certain systems, ensuring a robust startup experience.
-  * **Lifecycle Hardening**: Added comprehensive defensive null checks across all asynchronous callback paths.
-* 🐕 **Silent Watchdog Recovery**:
-  * Optimized the BLE Watchdog workflow to repair data streams silently in the background without triggering intrusive UI state updates.
+#### v0.5.3
+* 🚀 **Enhanced Device Discovery (Explorer-Grade Logic)**:
+  * **Dual-Watcher Architecture**: Integrated `DeviceWatcher` alongside `AdvertisementWatcher` to monitor both BLE packets and system-level device endpoints simultaneously.
+  * **Connection-Triggered Rescan**: Automatically initiates a full scan upon successful connection to ensure immediate synchronization of system properties.
+  * **Extended Advertisement Support**: Enabled support for Bluetooth 5.0+ Extended Advertisements, improving detection for newer AirPods models.
+  * **Active Scanning**: Standardized on Active Scanning mode to retrieve more complete device metadata.
 
 ## 🛠️ Build
 See [Build Instructions](/Docs/Build.md).

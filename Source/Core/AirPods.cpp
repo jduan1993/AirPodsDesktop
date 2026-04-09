@@ -424,6 +424,9 @@ void Manager::OnBoundDeviceConnectionStateChanged(Bluetooth::DeviceState state)
             if (ApdApp->GetMainWindow()) {
                 ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
             }
+
+            // Bluetooth LE Explorer Start button logic at connection success
+            StartScanner();
         }
     }
 }

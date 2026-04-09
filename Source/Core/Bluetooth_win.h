@@ -123,6 +123,7 @@ private:
     static constexpr inline auto kRetryInterval = 3s;
 
     WinrtBluetoothAdv::BluetoothLEAdvertisementWatcher _bleWatcher;
+    WinrtDevicesEnumeration::DeviceWatcher _deviceWatcher{ nullptr };
     std::mutex _mutex;
 
     std::atomic<bool> _stop{false}, _destroy{false};

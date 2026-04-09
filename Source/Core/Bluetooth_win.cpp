@@ -281,6 +281,38 @@ AdvertisementWatcher::AdvertisementWatcher()
 {
     _bleWatcher.Received(std::bind(&AdvertisementWatcher::OnReceived, this, _2));
     _bleWatcher.Stopped(std::bind(&AdvertisementWatcher::OnStopped, this, _2));
+
+    try {
+        // Bluetooth LE Explorer logic: Create a DeviceWatcher for AEP devices
+        winrt::hstring aqs = L"(System.Devices.Aep.ProtocolId:=\"{bb7bb05e-5972-42b5-94fc-76eaa7084d49}\")";
+        _deviceWatcher = DeviceInformation::CreateWatcher(
+            aqs,
+            {
+                L"System.Devices.GlyphIcon",
+                L"System.Devices.Aep.Category",
+                L"System.Devices.Aep.ContainerId",
+                L"System.Devices.Aep.DeviceAddress",
+                L"System.Devices.Aep.IsConnected",
+                L"System.Devices.Aep.IsPaired",
+                L"System.Devices.Aep.IsPresent",
+                L"System.Devices.Aep.ProtocolId",
+                L"System.Devices.Aep.Bluetooth.Le.IsConnectable",
+                L"System.Devices.Aep.SignalStrength",
+                L"System.Devices.Aep.Bluetooth.LastSeenTime",
+            },
+            DeviceInformationKind::AssociationEndpoint
+        );
+
+        // Dummy handlers to satisfy the watcher requirement
+        _deviceWatcher.Added([](auto&&, auto&&) {});
+        _deviceWatcher.Updated([](auto&&, auto&&) {});
+        _deviceWatcher.Removed([](auto&&, auto&&) {});
+        _deviceWatcher.EnumerationCompleted([](auto&&, auto&&) {});
+        _deviceWatcher.Stopped([](auto&&, auto&&) {});
+    }
+    catch (const OS::Windows::Winrt::Exception &ex) {
+        LOG(Warn, "Create device watcher failed. {}", Helper::ToString(ex));
+    }
 }
 
 AdvertisementWatcher::~AdvertisementWatcher()
@@ -303,9 +335,23 @@ bool AdvertisementWatcher::Start()
         
         // Use Active scanning mode to improve the probability of capturing AirPods advertisements
         _bleWatcher.ScanningMode(BluetoothLEScanningMode::Active);
+
+        // Bluetooth LE Explorer logic: Allow extended advertisements if supported
+        try {
+            _bleWatcher.AllowExtendedAdvertisements(true);
+        }
+        catch (...) {}
         
         _bleWatcher.Start();
-        LOG(Info, "Bluetooth AdvWatcher start succeeded. Mode: Active");
+
+        // Bluetooth LE Explorer logic: Start DeviceWatcher alongside AdvertisementWatcher
+        if (_deviceWatcher && _deviceWatcher.Status() != DeviceWatcherStatus::Started && 
+            _deviceWatcher.Status() != DeviceWatcherStatus::Started) 
+        {
+            _deviceWatcher.Start();
+        }
+
+        LOG(Info, "Bluetooth AdvWatcher and DeviceWatcher start succeeded. Mode: Active");
         CbStateChanged().Invoke(State::Started, std::nullopt);
         return true;
     }
@@ -323,7 +369,14 @@ bool AdvertisementWatcher::Stop()
 
         std::lock_guard<std::mutex> lock{_mutex};
         _bleWatcher.Stop();
-        LOG(Info, "Bluetooth AdvWatcher stop succeeded.");
+
+        if (_deviceWatcher && (_deviceWatcher.Status() == DeviceWatcherStatus::Started || 
+                               _deviceWatcher.Status() == DeviceWatcherStatus::EnumerationCompleted)) 
+        {
+            _deviceWatcher.Stop();
+        }
+
+        LOG(Info, "Bluetooth AdvWatcher and DeviceWatcher stop succeeded.");
         return true;
     }
     catch (const OS::Windows::Winrt::Exception &ex) {

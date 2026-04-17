@@ -22,6 +22,7 @@
 #include <QFont>
 #include <QPainter>
 #include <QSvgRenderer>
+#include <mutex>
 
 #include <Config.h>
 #include "../Application.h"
@@ -38,6 +39,10 @@ TrayIcon::TrayIcon()
     connect(_tray, &QSystemTrayIcon::activated, this, &TrayIcon::OnIconClicked);
     connect(_tray, &QSystemTrayIcon::messageClicked, this, [this]() { ShowMainWindow(); });
 
+    connect(this, &TrayIcon::OnUpdateStateSafely, this, &TrayIcon::UpdateState);
+    connect(this, &TrayIcon::OnUnavailableSafely, this, &TrayIcon::Unavailable);
+    connect(this, &TrayIcon::OnDisconnectSafely, this, &TrayIcon::Disconnect);
+    connect(this, &TrayIcon::OnUnbindSafely, this, &TrayIcon::Unbind);
     connect(
         this, &TrayIcon::OnTrayIconBatteryChangedSafely, this, &TrayIcon::OnTrayIconBatteryChanged);
 
@@ -62,6 +67,11 @@ void TrayIcon::UpdateState(const Core::AirPods::State &state)
     Repaint();
 }
 
+void TrayIcon::UpdateStateSafely(const Core::AirPods::State &state)
+{
+    emit OnUpdateStateSafely(state);
+}
+
 void TrayIcon::Unavailable()
 {
     _status = Status::Unavailable;
@@ -69,6 +79,11 @@ void TrayIcon::Unavailable()
         _airPodsState.reset();
     }
     Repaint();
+}
+
+void TrayIcon::UnavailableSafely()
+{
+    emit OnUnavailableSafely();
 }
 
 void TrayIcon::Disconnect()
@@ -80,11 +95,21 @@ void TrayIcon::Disconnect()
     Repaint();
 }
 
+void TrayIcon::DisconnectSafely()
+{
+    emit OnDisconnectSafely();
+}
+
 void TrayIcon::Unbind()
 {
     _status = Status::Unbind;
     _airPodsState.reset();
     Repaint();
+}
+
+void TrayIcon::UnbindSafely()
+{
+    emit OnUnbindSafely();
 }
 
 void TrayIcon::VersionUpdateAvailable(const Core::Update::ReleaseInfo &releaseInfo)
@@ -228,6 +253,8 @@ std::optional<QImage> TrayIcon::GenerateIcon(
         const auto &text = optText.value();
 
         static std::unordered_map<int, std::optional<QFont>> trayIconFonts;
+        static std::mutex trayIconFontsMutex;
+        std::lock_guard<std::mutex> lock{trayIconFontsMutex};
 
         const auto &adjustFont = [](const QString &family,
                                     int desiredSize) -> std::optional<QFont> {

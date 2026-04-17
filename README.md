@@ -27,12 +27,13 @@
 ![Preview Image](/Assets/Preview.gif)
 
 ## ✨ Features
-#### v0.5.3
-* 🚀 **Enhanced Device Discovery (Explorer-Grade Logic)**:
-  * **Dual-Watcher Architecture**: Integrated `DeviceWatcher` alongside `AdvertisementWatcher` to monitor both BLE packets and system-level device endpoints simultaneously.
-  * **Connection-Triggered Rescan**: Automatically initiates a full scan upon successful connection to ensure immediate synchronization of system properties.
-  * **Extended Advertisement Support**: Enabled support for Bluetooth 5.0+ Extended Advertisements, improving detection for newer AirPods models.
-  * **Active Scanning**: Standardized on Active Scanning mode to retrieve more complete device metadata.
+#### v0.5.4
+* 🛡️ **Architecture Hardening**:
+  * **Deadlock Elimination**: Resolved critical circular lock dependencies between discovery and management logic. Binding/unbinding is now 100% reliable.
+  * **Thread-Safe UI**: Re-engineered UI updates to use main-thread marshaling, fixing random crashes (Access Violations) during status changes.
+* ⚡ **Performance & Stability**:
+  * **Async Hardware Control**: Standardized all Bluetooth radio controls to be non-blocking.
+  * **Font Cache Safety**: Added mutex protection for tray icon rendering resources.
 
 ## 🛠️ Build
 See [Build Instructions](/Docs/Build.md).

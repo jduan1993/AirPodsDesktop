@@ -133,6 +133,10 @@ TaskbarStatus::TaskbarStatus(QWidget *parent) : QDialog{parent}
     _isWin11OrGreater = Core::OS::Windows::System::Is11OrGreater();
     LOG(Info, "Is Windows 11 or greater: '{}'", _isWin11OrGreater);
 
+    connect(this, &TaskbarStatus::OnUpdateStateSafely, this, &TaskbarStatus::UpdateState);
+    connect(this, &TaskbarStatus::OnUnavailableSafely, this, &TaskbarStatus::Unavailable);
+    connect(this, &TaskbarStatus::OnDisconnectSafely, this, &TaskbarStatus::Disconnect);
+    connect(this, &TaskbarStatus::OnUnbindSafely, this, &TaskbarStatus::Unbind);
     connect(this, &TaskbarStatus::OnSettingsChangedSafely, this, &TaskbarStatus::OnSettingsChanged);
 
     _updateTimer.callOnTimeout([this] { OnUpdateTimer(); });
@@ -184,6 +188,11 @@ void TaskbarStatus::UpdateState(const Core::AirPods::State &state)
     _status = Status::Updating;
     _airPodsState = state;
     Repaint();
+}
+
+void TaskbarStatus::UpdateStateSafely(const Core::AirPods::State &state)
+{
+    emit OnUpdateStateSafely(state);
 }
 
 void TaskbarStatus::UpdateVisible()
@@ -320,6 +329,11 @@ void TaskbarStatus::Unavailable()
     Repaint();
 }
 
+void TaskbarStatus::UnavailableSafely()
+{
+    emit OnUnavailableSafely();
+}
+
 void TaskbarStatus::Disconnect()
 {
     _status = Status::Disconnected;
@@ -329,11 +343,21 @@ void TaskbarStatus::Disconnect()
     Repaint();
 }
 
+void TaskbarStatus::DisconnectSafely()
+{
+    emit OnDisconnectSafely();
+}
+
 void TaskbarStatus::Unbind()
 {
     _status = Status::Unbind;
     _airPodsState.reset();
     Repaint();
+}
+
+void TaskbarStatus::UnbindSafely()
+{
+    emit OnUnbindSafely();
 }
 
 void TaskbarStatus::Repaint()

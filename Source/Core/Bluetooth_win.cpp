@@ -412,7 +412,6 @@ void AdvertisementWatcher::OnReceived(const BluetoothLEAdvertisementReceivedEven
         receivedData.manufacturerDataMap.try_emplace(companyId, std::move(stdData));
     }
 
-    std::lock_guard<std::mutex> lock{_mutex};
     CbReceived().Invoke(receivedData);
 }
 

@@ -35,6 +35,8 @@
 #include "../Assert.h"
 #include "../Application.h"
 #include "../Gui/MainWindow.h"
+#include "../Gui/TrayIcon.h"
+#include "../Gui/TaskbarStatus.h"
 
 using namespace Core;
 using namespace std::chrono_literals;
@@ -143,17 +145,14 @@ const std::vector<uint8_t> &Advertisement::GetMfrData() const
 StateManager::StateManager()
 {
     _lostTimer.Start(20s, [this] {
-        std::lock_guard<std::mutex> lock{_mutex};
         DoLost();
     });
 
     _stateResetTimer.left.Start(20s, [this] {
-        std::lock_guard<std::mutex> lock{_mutex};
         DoStateReset(Side::Left);
     });
 
     _stateResetTimer.right.Start(20s, [this] {
-        std::lock_guard<std::mutex> lock{_mutex};
         DoStateReset(Side::Right);
     });
 }
@@ -284,26 +283,36 @@ void StateManager::ResetAll()
 
 void StateManager::DoLost()
 {
-    if (_cachedState.has_value()) {
-        LOG(Info, "StateManager: Data stream lost (20s), clearing state.");
-        _adv.left.reset();
-        _adv.right.reset();
-        auto event = UpdateState();
-        if (event && _cbStateChanged)
-            _cbStateChanged(*event);
+    std::optional<UpdateEvent> event;
+    {
+        std::lock_guard<std::mutex> lock{_mutex};
+        if (_cachedState.has_value()) {
+            LOG(Info, "StateManager: Data stream lost (20s), clearing state.");
+            _adv.left.reset();
+            _adv.right.reset();
+            event = UpdateState();
+        }
     }
+
+    if (event && _cbStateChanged)
+        _cbStateChanged(*event);
 }
 
 void StateManager::DoStateReset(Side side)
 {
-    auto &adv = side == Side::Left ? _adv.left : _adv.right;
-    if (adv.has_value()) {
-        LOG(Info, "StateManager: Side {} reset due to timeout.", Helper::ToString(side));
-        adv.reset();
-        auto event = UpdateState();
-        if (event && _cbStateChanged)
-            _cbStateChanged(*event);
+    std::optional<UpdateEvent> event;
+    {
+        std::lock_guard<std::mutex> lock{_mutex};
+        auto &adv = side == Side::Left ? _adv.left : _adv.right;
+        if (adv.has_value()) {
+            LOG(Info, "StateManager: Side {} reset due to timeout.", Helper::ToString(side));
+            adv.reset();
+            event = UpdateState();
+        }
     }
+
+    if (event && _cbStateChanged)
+        _cbStateChanged(*event);
 }
 } // namespace Details
 
@@ -358,75 +367,113 @@ void Manager::OnAutomaticEarDetectionChanged(bool enable)
 
 void Manager::OnBoundDeviceAddressChanged(uint64_t address)
 {
-    std::unique_lock<std::mutex> lock{_mutex};
-    _boundDevice.reset();
-    _deviceConnected = false;
-    this->_lastReportedInEar = false;
-    _stateMgr.Disconnect();
+    {
+        std::unique_lock<std::mutex> lock{_mutex};
+        _boundDevice.reset();
+        _deviceConnected = false;
+        this->_lastReportedInEar = false;
+        _stateMgr.Disconnect();
 
-    // Reset Watchdog on device change
-    auto now = std::chrono::steady_clock::now();
-    _lastAdvTime = now;
-    _connectedAt = now;
-    _bleHealthy = true;
-    _recoveryStage = 0;
-    _bleMissCount = 0;
+        // Reset Watchdog on device change
+        auto now = std::chrono::steady_clock::now();
+        _lastAdvTime = now;
+        _connectedAt = now;
+        _bleHealthy = true;
+        _recoveryStage = 0;
+        _bleMissCount = 0;
 
-    if (address == 0) {
-        LOG(Info, "Device address cleared (unbound).");
-        return;
+        if (address == 0) {
+            LOG(Info, "Device address cleared (unbound).");
+            return;
+        }
+
+        auto optDevice = Bluetooth::DeviceManager::FindDevice(address);
+        if (!optDevice.has_value()) {
+            LOG(Error, "Device binding failed: Bluetooth address {} not found in system paired list.",
+                address);
+            QMessageBox::warning(nullptr, Config::ProgramName, QObject::tr("No paired device found."));
+            return;
+        }
+
+        _boundDevice = std::move(optDevice);
+        _deviceName = QString::fromStdString(_boundDevice->GetName());
+        _boundDevice->CbConnectionStatusChanged() += [this](auto state) {
+            OnBoundDeviceConnectionStateChanged(state);
+        };
+        LOG(Info, "Successfully bound to device: '{}' ({})", _deviceName.toStdString(), address);
+        
+        // Use connection state to trigger initial sync
+        auto initialState = _boundDevice->GetConnectionState();
+        QMetaObject::invokeMethod(ApdApp, [this, initialState] {
+            OnBoundDeviceConnectionStateChanged(initialState);
+        }, Qt::QueuedConnection);
     }
-
-    auto optDevice = Bluetooth::DeviceManager::FindDevice(address);
-    if (!optDevice.has_value()) {
-        LOG(Error, "Device binding failed: Bluetooth address {} not found in system paired list.",
-            address);
-        QMessageBox::warning(nullptr, Config::ProgramName, QObject::tr("No paired device found."));
-        return;
-    }
-
-    _boundDevice = std::move(optDevice);
-    _deviceName = QString::fromStdString(_boundDevice->GetName());
-    _boundDevice->CbConnectionStatusChanged() += [this](auto &&...args) {
-        std::lock_guard<std::mutex> lock{_mutex};
-        OnBoundDeviceConnectionStateChanged(std::forward<decltype(args)>(args)...);
-    };
-    LOG(Info, "Successfully bound to device: '{}' ({})", _deviceName.toStdString(), address);
-    OnBoundDeviceConnectionStateChanged(_boundDevice->GetConnectionState());
 }
 
 void Manager::OnBoundDeviceConnectionStateChanged(Bluetooth::DeviceState state)
 {
     bool newConnected = (state == Bluetooth::DeviceState::Connected);
-    if (_deviceConnected != newConnected) {
-        _deviceConnected = newConnected;
-        LOG(Info, "System Connection changed: Connected={}", bool(_deviceConnected));
-        
-        // Reset Watchdog state and record connection time
-        auto now = std::chrono::steady_clock::now();
-        _recoveryStage = 0;
-        _bleHealthy = true;
-        _lastAdvTime = now;
-        _connectedAt = now;
-        _bleMissCount = 0;
+    bool changed = false;
+    
+    {
+        std::lock_guard<std::mutex> lock{_mutex};
+        if (_deviceConnected != newConnected) {
+            _deviceConnected = newConnected;
+            changed = true;
+            
+            // Reset Watchdog state and record connection time
+            auto now = std::chrono::steady_clock::now();
+            _recoveryStage = 0;
+            _bleHealthy = true;
+            _lastAdvTime = now;
+            _connectedAt = now;
+            _bleMissCount = 0;
 
-        if (!_deviceConnected) {
-            this->_lastReportedInEar = false;
-            _stateMgr.Disconnect();
-            if (ApdApp->GetMainWindow()) {
-                ApdApp->GetMainWindow()->DisconnectSafely();
+            if (!_deviceConnected) {
+                this->_lastReportedInEar = false;
+                _stateMgr.Disconnect();
+                
+                QMetaObject::invokeMethod(ApdApp, [] {
+                    if (ApdApp->GetMainWindow())
+                        ApdApp->GetMainWindow()->DisconnectSafely();
+                    if (ApdApp->GetTrayIcon())
+                        ApdApp->GetTrayIcon()->DisconnectSafely();
+                    if (ApdApp->GetTaskbarStatus())
+                        ApdApp->GetTaskbarStatus()->UnavailableSafely();
+                }, Qt::QueuedConnection);
             }
         }
-        else if (_boundDevice.has_value()) {
+    }
+
+    if (changed) {
+        LOG(Info, "System Connection changed: Connected={}", bool(_deviceConnected));
+        
+        if (_deviceConnected) {
             State forceState;
-            forceState.model = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
-            forceState.displayName = _deviceName;
-            if (ApdApp->GetMainWindow()) {
-                ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
+            {
+                std::lock_guard<std::mutex> lock{_mutex};
+                if (_boundDevice.has_value()) {
+                    forceState.model = AppleCP::AirPods::GetModel(_boundDevice->GetProductId());
+                    forceState.displayName = _deviceName;
+                }
+            }
+            
+            if (!forceState.displayName.isEmpty()) {
+                QMetaObject::invokeMethod(ApdApp, [forceState] {
+                    if (ApdApp->GetMainWindow())
+                        ApdApp->GetMainWindow()->UpdateStateSafely(forceState);
+                    if (ApdApp->GetTrayIcon())
+                        ApdApp->GetTrayIcon()->UpdateStateSafely(forceState);
+                    if (ApdApp->GetTaskbarStatus())
+                        ApdApp->GetTaskbarStatus()->UpdateStateSafely(forceState);
+                }, Qt::QueuedConnection);
             }
 
-            // Bluetooth LE Explorer Start button logic at connection success
-            StartScanner();
+            // Use QueuedConnection to ensure we are not holding any locks (including internal ones from WinRT)
+            // when starting the scanner.
+            QMetaObject::invokeMethod(ApdApp, [this] {
+                StartScanner();
+            }, Qt::QueuedConnection);
         }
     }
 }
@@ -498,21 +545,31 @@ void Manager::OnStateChanged(Details::StateManager::UpdateEvent updateEvent)
         newState.displayName = Helper::ToString(newState.model);
     }
 
-    if (ApdApp->GetMainWindow()) {
-        ApdApp->GetMainWindow()->UpdateStateSafely(newState);
-    }
-
+    // Capture states for the lambda
+    bool oldStateValid = updateEvent.oldState.has_value();
+    bool oldLidOpened = oldStateValid ? updateEvent.oldState->caseBox.isLidOpened : false;
     bool newLidOpened = newState.caseBox.isLidOpened && newState.caseBox.isBothPodsInCase;
-    if (!updateEvent.oldState.has_value() ||
-        (updateEvent.oldState->caseBox.isLidOpened != newState.caseBox.isLidOpened))
-        OnLidOpened(newLidOpened);
+    bool lidChanged = !oldStateValid || (oldLidOpened != newState.caseBox.isLidOpened);
+    bool anyInEar = newState.pods.left.isInEar || newState.pods.right.isInEar;
 
-    if (!updateEvent.oldState.has_value()) {
-        bool newAnyInEar = newState.pods.left.isInEar || newState.pods.right.isInEar;
-        this->_lastReportedInEar = !newAnyInEar;
-        LOG(Debug, "System Consistency: State recovered. AnyInEar={}, SyncFlag={}", newAnyInEar,
-            bool(this->_lastReportedInEar));
-    }
+    // Dispatch all GUI updates to main thread
+    QMetaObject::invokeMethod(ApdApp, [this, newState, lidChanged, newLidOpened, oldStateValid, anyInEar] {
+        if (ApdApp->GetMainWindow())
+            ApdApp->GetMainWindow()->UpdateStateSafely(newState);
+        if (ApdApp->GetTrayIcon())
+            ApdApp->GetTrayIcon()->UpdateStateSafely(newState);
+        if (ApdApp->GetTaskbarStatus())
+            ApdApp->GetTaskbarStatus()->UpdateStateSafely(newState);
+
+        if (lidChanged)
+            OnLidOpened(newLidOpened);
+
+        if (!oldStateValid) {
+            this->_lastReportedInEar = !anyInEar;
+            LOG(Debug, "System Consistency: State recovered. AnyInEar={}, SyncFlag={}", anyInEar,
+                bool(this->_lastReportedInEar));
+        }
+    }, Qt::QueuedConnection);
 
     OnBothInEar(newState);
 }
@@ -669,14 +726,17 @@ void Manager::OnAdvWatcherStateChanged(
     Bluetooth::AdvertisementWatcher::State state, const std::optional<std::string> &error)
 {
     if (state == Core::Bluetooth::AdvertisementWatcher::State::Started) {
-        if (ApdApp->GetMainWindow()) {
-            ApdApp->GetMainWindow()->AvailableSafely();
-        }
+        QMetaObject::invokeMethod(ApdApp, [] {
+            if (ApdApp->GetMainWindow())
+                ApdApp->GetMainWindow()->AvailableSafely();
+        }, Qt::QueuedConnection);
     }
     else if (state == Core::Bluetooth::AdvertisementWatcher::State::Stopped) {
-        if (ApdApp->GetMainWindow()) {
-            ApdApp->GetMainWindow()->UnavailableSafely();
-        }
+        QMetaObject::invokeMethod(ApdApp, [] {
+            if (ApdApp->GetMainWindow())
+                ApdApp->GetMainWindow()->UnavailableSafely();
+        }, Qt::QueuedConnection);
+        
         if (error.has_value()) {
             LOG(Error, "Bluetooth Watcher stopped: {}. Throttling restart...", *error);
 

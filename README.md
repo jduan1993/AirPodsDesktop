@@ -27,13 +27,11 @@
 ![Preview Image](/Assets/Preview.gif)
 
 ## ✨ Features
-#### v0.5.4
-* 🛡️ **Architecture Hardening**:
-  * **Deadlock Elimination**: Resolved critical circular lock dependencies between discovery and management logic. Binding/unbinding is now 100% reliable.
-  * **Thread-Safe UI**: Re-engineered UI updates to use main-thread marshaling, fixing random crashes (Access Violations) during status changes.
-* ⚡ **Performance & Stability**:
-  * **Async Hardware Control**: Standardized all Bluetooth radio controls to be non-blocking.
-  * **Font Cache Safety**: Added mutex protection for tray icon rendering resources.
+#### v0.5.5
+* 📶 **Bluetooth Stability**:
+  * **Idempotent Start**: Fixed `0xffffffff8000000e` exception by adding state validation before starting the BLE watcher.
+  * **Race Condition Mitigation**: Resolved startup conflicts where redundant scanner starts were triggered by initial connection events.
+  * **Bug Fix**: Corrected status check logic for `DeviceWatcher` (was checking `Started` twice instead of `EnumerationCompleted`).
 
 ## 🛠️ Build
 See [Build Instructions](/Docs/Build.md).

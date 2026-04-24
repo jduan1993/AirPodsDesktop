@@ -332,9 +332,20 @@ bool AdvertisementWatcher::Start()
         _lastStartTime = std::chrono::steady_clock::now();
 
         std::lock_guard<std::mutex> lock{_mutex};
+
+        // Ensure we only start the watcher if it's in a valid state
+        auto status = _bleWatcher.Status();
+        if (status == WinrtBluetoothAdv::BluetoothLEAdvertisementWatcherStatus::Started) {
+            LOG(Info, "Bluetooth AdvWatcher is already started.");
+            return true;
+        }
+        if (status == WinrtBluetoothAdv::BluetoothLEAdvertisementWatcherStatus::Stopping) {
+            LOG(Warn, "Bluetooth AdvWatcher is stopping. Please wait for it to stop before restarting.");
+            return false;
+        }
         
         // Use Active scanning mode to improve the probability of capturing AirPods advertisements
-        _bleWatcher.ScanningMode(BluetoothLEScanningMode::Active);
+        _bleWatcher.ScanningMode(WinrtBluetoothAdv::BluetoothLEScanningMode::Active);
 
         // Bluetooth LE Explorer logic: Allow extended advertisements if supported
         try {
@@ -345,8 +356,8 @@ bool AdvertisementWatcher::Start()
         _bleWatcher.Start();
 
         // Bluetooth LE Explorer logic: Start DeviceWatcher alongside AdvertisementWatcher
-        if (_deviceWatcher && _deviceWatcher.Status() != DeviceWatcherStatus::Started && 
-            _deviceWatcher.Status() != DeviceWatcherStatus::Started) 
+        if (_deviceWatcher && _deviceWatcher.Status() != WinrtDevicesEnumeration::DeviceWatcherStatus::Started && 
+            _deviceWatcher.Status() != WinrtDevicesEnumeration::DeviceWatcherStatus::EnumerationCompleted) 
         {
             _deviceWatcher.Start();
         }
